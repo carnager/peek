@@ -294,4 +294,5 @@
     <string name="gallery_only_phone">Nur auf diesem Handy, noch nicht auf trunk</string>
     <string name="gallery_upload">Hochladen</string>
     <string name="gallery_albums_phone">Alben auf dem Handy</string>
+    <string name="gallery_only_phone_count">Nur auf dem Handy · %1$d</string>
 </resources>

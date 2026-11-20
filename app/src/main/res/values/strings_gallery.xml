@@ -296,4 +296,5 @@
     <string name="gallery_only_phone">Only on this phone, not on trunk yet</string>
     <string name="gallery_upload">Upload</string>
     <string name="gallery_albums_phone">Albums on this phone</string>
+    <string name="gallery_only_phone_count">Only on phone · %1$d</string>
 </resources>

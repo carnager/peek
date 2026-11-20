@@ -1,5 +1,6 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.fillMaxSize
@@ -570,6 +571,17 @@ private fun TrunkHeader(vm: GalleryViewModel) {
         if (direct.isNotEmpty()) {
             StripTitle(stringResource(R.string.gallery_shared))
             Strip { items(direct, key = { it.id }) { a -> TrunkStripCard(vm, a) } }
+        }
+        // What is still only on the phone: one tap shows just those, another everything again.
+        val onlyPhone = TrunkFilter.OnlyPhone in vm.trunkFilters
+        if (vm.phoneOnly.isNotEmpty() || onlyPhone) {
+            FilterChip(
+                selected = onlyPhone,
+                onClick = { vm.trunkFilters = if (onlyPhone) vm.trunkFilters - TrunkFilter.OnlyPhone else vm.trunkFilters + TrunkFilter.OnlyPhone },
+                leadingIcon = { Icon(Icons.Rounded.CloudOff, null, Modifier.size(18.dp)) },
+                label = { Text(stringResource(R.string.gallery_only_phone_count, vm.phoneOnly.size)) },
+                modifier = Modifier.padding(start = 13.dp, top = 14.dp),
+            )
         }
     }
     if (creating) {
