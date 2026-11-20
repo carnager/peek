@@ -124,14 +124,14 @@ private fun Modifier.pinchColumns(onChange: (Int) -> Unit): Modifier = pointerIn
     }
 }
 
-/** Index of the grid item under [pos] (grid coordinates), if any. */
-private fun LazyGridState.itemAt(pos: Offset): Int? {
+/** Key of the grid item under [pos] (grid coordinates), if any. */
+private fun LazyGridState.keyAt(pos: Offset): Any? {
     val info = layoutInfo
     return info.visibleItemsInfo.firstOrNull {
         val top = it.offset.y - info.viewportStartOffset
         val left = it.offset.x
         pos.y >= top && pos.y < top + it.size.height && pos.x >= left && pos.x < left + it.size.width
-    }?.index
+    }?.key
 }
 
 /**
@@ -166,7 +166,12 @@ private fun Modifier.dragSelect(
         if (held != null || lifted) return@awaitEachGesture
 
         val all = cells()
-        val anchor = grid.itemAt(down.position)?.takeIf { all.getOrNull(it) is Cell.Photo } ?: return@awaitEachGesture
+        // Grid positions and cell positions differ (the trash has an extra row on top), so go by key.
+        val indexOfId = HashMap<Long, Int>(all.size).apply {
+            all.forEachIndexed { i, c -> if (c is Cell.Photo) put(c.image.id, i) }
+        }
+        fun cellAt(p: Offset): Int? = (grid.keyAt(p) as? Long)?.let { indexOfId[it] }
+        val anchor = cellAt(down.position) ?: return@awaitEachGesture
         val base = selection()
         val adding = (all[anchor] as Cell.Photo).image.id !in base
         var lastIdx = -1
@@ -186,7 +191,7 @@ private fun Modifier.dragSelect(
             while (isActive) {
                 if (speed != 0f) {
                     grid.scrollBy(speed)
-                    grid.itemAt(pos)?.let(::update)
+                    cellAt(pos)?.let(::update)
                 }
                 delay(16)
             }
@@ -203,7 +208,7 @@ private fun Modifier.dragSelect(
                     pos.y > size.height - edgePx -> ((pos.y - (size.height - edgePx)) / edgePx).coerceIn(0f, 1f) * 28f
                     else -> 0f
                 }
-                grid.itemAt(pos)?.let(::update)
+                cellAt(pos)?.let(::update)
             }
         } finally {
             scroller.cancel()

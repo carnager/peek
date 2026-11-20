@@ -235,6 +235,12 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
         onPauseOrDispose {}
     }
     val byId = remember(vm.images) { vm.images.associateBy { it.id } }
+    // When the photos arrive after the cards below them, show the "all photos" card instead of
+    // keeping the list anchored on whatever was first before.
+    val hasImages = vm.images.isNotEmpty()
+    LaunchedEffect(hasImages) {
+        if (hasImages && grid.firstVisibleItemIndex <= 2) grid.scrollToItem(0)
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),

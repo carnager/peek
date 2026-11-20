@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /** What an image grid shows. */
@@ -111,11 +112,22 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         job?.cancel()
         job = viewModelScope.launch {
             val ctx = getApplication<Application>()
-            val trashed = async { runCatching { MediaRepository.loadImages(ctx, trashed = true) }.getOrDefault(emptyList()) }
-            val list = runCatching { MediaRepository.loadImages(ctx) }.getOrDefault(emptyList())
+            // A newer reload cancels this one; that must not be mistaken for "no images", or a
+            // cancelled load would overwrite the real list with an empty one.
+            suspend fun load(trashed: Boolean) = try {
+                MediaRepository.loadImages(ctx, trashed)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyList()
+            }
+            val trashed = async { load(trashed = true) }
+            val list = load(trashed = false)
+            val trashList = trashed.await()
+            ensureActive()
             images = list
             folders = MediaRepository.albumsOf(list)
-            trash = trashed.await()
+            trash = trashList
             loaded = true
             val ids = (list + trash).mapTo(HashSet()) { it.id }
             selection = selection.filterTo(HashSet()) { it in ids }
