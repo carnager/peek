@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- A little creature peeking over the top of a photo. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFFFFF" android:pathData="M34,32h40a6,6 0,0 1,6 6v32a6,6 0,0 1,-6 6h-40a6,6 0,0 1,-6 -6v-32a6,6 0,0 1,6 -6zM34,37a1,1 0,0 0,-1 1v25l11,-11l9,9l6,-6l16,16v-33a1,1 0,0 0,-1 -1z" />
-    <path android:fillColor="#FFC857" android:pathData="M64,46m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+    <group android:pivotX="54" android:pivotY="56" android:scaleX="0.9" android:scaleY="0.9">
+        <path android:fillColor="#5B3FD9" android:pathData="M33,58 C33,36 41,25 54,25 C67,25 75,36 75,58 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M40.3,42 a6.2,7.2 0 1,0 12.4,0 a6.2,7.2 0 1,0 -12.4,0 Z M55.3,42 a6.2,7.2 0 1,0 12.4,0 a6.2,7.2 0 1,0 -12.4,0 Z" />
+        <path android:fillColor="#1E1B3A" android:pathData="M44.6,45 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0 Z M59.6,45 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M48.1,43.7 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0 Z M63.1,43.7 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0 Z" />
+        <group android:pivotX="54" android:pivotY="66" android:rotation="-7">
+            <path android:fillColor="#FFFFFF" android:pathData="M35,52 h38 a5,5 0 0 1 5,5 v20 a5,5 0 0 1 -5,5 h-38 a5,5 0 0 1 -5,-5 v-20 a5,5 0 0 1 5,-5 Z" />
+            <path android:fillColor="#9ED8F5" android:pathData="M36.0,55.5 h36.0 a2.5,2.5 0 0 1 2.5,2.5 v18.0 a2.5,2.5 0 0 1 -2.5,2.5 h-36.0 a2.5,2.5 0 0 1 -2.5,-2.5 v-18.0 a2.5,2.5 0 0 1 2.5,-2.5 Z" />
+            <path android:fillColor="#FF7A59" android:pathData="M62.4,61.5 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0 Z" />
+            <path android:fillColor="#2BB673" android:pathData="M33.5,74 L43,64.5 L50,71 L56,66 L74.5,78.5 L33.5,78.5 Z" />
+            <path android:fillColor="#5B3FD9" android:pathData="M32.9,52.6 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z M37.9,52.2 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z M64.9,52.2 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z M69.9,52.6 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" />
+        </group>
+    </group>
 </vector>
