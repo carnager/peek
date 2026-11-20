@@ -29,8 +29,8 @@ android {
         applicationId = "io.github.carnager.peek"
         minSdk = 30
         targetSdk = 36
-        versionCode = 16
-        versionName = "0.15.1"
+        versionCode = 17
+        versionName = "0.16.0"
     }
 
     // English by default, German when the phone (or peek's own language setting) says so. The
