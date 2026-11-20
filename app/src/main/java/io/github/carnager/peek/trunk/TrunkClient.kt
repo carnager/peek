@@ -399,6 +399,14 @@ object TrunkClient {
     }
 
     suspend fun trash(ids: Collection<Long>) = idsCall("/assets/trash", ids)
+
+    /** Groups of look-alike photos (trunk 1f9c1f1 and later; older servers answer 404). */
+    suspend fun similar(): JSONObject = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/similar")).build())
+    }
+
+    /** These photos are no look-alikes of each other: their group goes away for good. */
+    suspend fun similarIgnore(ids: Collection<Long>) = idsCall("/similar/ignore", ids)
     suspend fun restore(ids: Collection<Long>) = idsCall("/assets/restore", ids)
     suspend fun deleteForever(ids: Collection<Long>) = idsCall("/assets/delete", ids)
 

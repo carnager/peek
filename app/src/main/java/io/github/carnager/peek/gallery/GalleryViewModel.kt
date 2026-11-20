@@ -529,6 +529,72 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // --- clean-up: look-alikes on trunk ---
+
+    /** Photos that look alike: one picture in several files ([burst] false), or a burst of shots. */
+    class SimilarGroup(val ids: List<Long>, val keep: Long, val burst: Boolean)
+
+    var cleanupOpen by mutableStateOf(false)
+    /** null while loading. */
+    var similar by mutableStateOf<List<SimilarGroup>?>(null)
+        private set
+    /** Photos trunk has not fingerprinted yet. */
+    var similarPending by mutableIntStateOf(0)
+        private set
+    var similarError by mutableStateOf<String?>(null)
+        private set
+
+    private val trunkById: Map<Long, MediaImage> by androidx.compose.runtime.derivedStateOf {
+        trunk.associateBy { it.remote!!.id }
+    }
+
+    /** A group's photos as far as the library has them, newest first. */
+    fun similarImages(g: SimilarGroup): List<MediaImage> = g.ids.mapNotNull { trunkById[it] }
+
+    fun loadSimilar() {
+        similar = null
+        similarError = null
+        viewModelScope.launch {
+            try {
+                val o = TrunkClient.similar()
+                val arr = o.optJSONArray("groups") ?: org.json.JSONArray()
+                similar = List(arr.length()) { i ->
+                    val g = arr.getJSONObject(i)
+                    val ids = g.getJSONArray("asset_ids")
+                    SimilarGroup(List(ids.length()) { ids.getLong(it) }, g.optLong("keep"), g.optString("kind") == "burst")
+                }
+                similarPending = o.optInt("pending")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                similarError = if (e is io.github.carnager.peek.trunk.TrunkException && e.status == 404) {
+                    str(R.string.gallery_cleanup_unsupported)
+                } else {
+                    str(R.string.gallery_trunk_unreachable_detail, e.message ?: e.javaClass.simpleName)
+                }
+                similar = emptyList()
+            }
+        }
+    }
+
+    /** Moves the photos marked in these groups to trunk's trash; the groups are done. */
+    fun cleanUp(marked: Map<SimilarGroup, Set<Long>>) = trunkCall {
+        val ids = marked.values.flatten()
+        if (ids.isEmpty()) return@trunkCall
+        TrunkClient.trash(ids)
+        similar = similar?.filter { it !in marked.keys }
+        syncTrunk()
+        message = Message(plural(R.plurals.gallery_trunk_trashed, ids.size, ids.size), str(R.string.gallery_undo)) {
+            trunkCall { TrunkClient.restore(ids); syncTrunk(); loadSimilar() }
+        }
+    }
+
+    /** "Not the same": the group goes away for good. */
+    fun notSimilar(g: SimilarGroup) = trunkCall {
+        TrunkClient.similarIgnore(g.ids)
+        similar = similar?.filter { it !== g }
+    }
+
     /** Takes photos out of trunk's trash again. */
     fun trunkRestore(images: List<MediaImage>) = trunkCall {
         val ids = images.mapNotNull { it.remote?.id }

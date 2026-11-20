@@ -210,4 +210,34 @@
         <item quantity="one">Deleted %1$d photo permanently</item>
         <item quantity="other">Deleted %1$d photos permanently</item>
     </plurals>
+    <string name="gallery_cleanup">Clean up</string>
+    <string name="gallery_cleanup_tile">Copies &amp; bursts</string>
+    <string name="gallery_cleanup_all">Clean up all</string>
+    <string name="gallery_cleanup_all_title">Clean up everything?</string>
+    <string name="gallery_cleanup_hint">Copies of a photo and bursts of shots. Tap a photo to keep or delete it; the suggestion keeps the best one. Long-press to see it larger.</string>
+    <string name="gallery_cleanup_not_similar">Not the same</string>
+    <string name="gallery_cleanup_keep">Keep</string>
+    <string name="gallery_cleanup_empty_title">Nothing to clean up</string>
+    <string name="gallery_cleanup_empty_text">No copies or bursts in your library.</string>
+    <string name="gallery_cleanup_unsupported">Your trunk is too old for this. Update the server.</string>
+    <plurals name="gallery_cleanup_same">
+        <item quantity="one">Same picture · %1$d file</item>
+        <item quantity="other">Same picture · %1$d files</item>
+    </plurals>
+    <plurals name="gallery_cleanup_burst">
+        <item quantity="one">Burst · %1$d shot</item>
+        <item quantity="other">Burst · %1$d shots</item>
+    </plurals>
+    <plurals name="gallery_cleanup_delete">
+        <item quantity="one">Delete %1$d</item>
+        <item quantity="other">Delete %1$d</item>
+    </plurals>
+    <plurals name="gallery_cleanup_all_text">
+        <item quantity="one">%1$d photo goes to trunk\'s trash, as marked. You can restore it from there.</item>
+        <item quantity="other">%1$d photos go to trunk\'s trash, as marked. You can restore them from there.</item>
+    </plurals>
+    <plurals name="gallery_cleanup_pending">
+        <item quantity="one">%1$d photo is still being analysed.</item>
+        <item quantity="other">%1$d photos are still being analysed.</item>
+    </plurals>
 </resources>

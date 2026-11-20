@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesomeMosaic
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Cloud
@@ -273,6 +274,7 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
         }
 
         if (vm.settingsOpen) io.github.carnager.peek.settings.SettingsScreen(vm, ops) { vm.settingsOpen = false }
+        if (vm.cleanupOpen) CleanupScreen(vm) { vm.cleanupOpen = false }
         vm.review?.let { io.github.carnager.peek.review.ReviewScreen(vm, ops, it) }
 
         // Keep messages clear of whichever bar is showing: the viewer's actions, the selection
@@ -505,6 +507,11 @@ private fun TrunkHeader(vm: GalleryViewModel) {
             item(key = "trash") {
                 StripCard(stringResource(R.string.gallery_trash), countLabel(vm.trunkTrash.size), null, Icons.Rounded.DeleteOutline, MaterialTheme.colorScheme.onSurfaceVariant) {
                     vm.open = Source.TrunkTrash
+                }
+            }
+            item(key = "cleanup") {
+                StripCard(stringResource(R.string.gallery_cleanup), stringResource(R.string.gallery_cleanup_tile), null, Icons.Rounded.AutoAwesomeMosaic) {
+                    vm.cleanupOpen = true
                 }
             }
         }

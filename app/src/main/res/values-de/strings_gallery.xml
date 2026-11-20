@@ -208,4 +208,34 @@
         <item quantity="one">%1$d Bild endgültig gelöscht</item>
         <item quantity="other">%1$d Bilder endgültig gelöscht</item>
     </plurals>
+    <string name="gallery_cleanup">Aufräumen</string>
+    <string name="gallery_cleanup_tile">Kopien &amp; Serien</string>
+    <string name="gallery_cleanup_all">Alle aufräumen</string>
+    <string name="gallery_cleanup_all_title">Alles aufräumen?</string>
+    <string name="gallery_cleanup_hint">Kopien eines Bildes und Serienaufnahmen. Tippe ein Bild an, um es zu behalten oder zu löschen; vorgeschlagen ist, das beste zu behalten. Lange drücken zeigt es groß.</string>
+    <string name="gallery_cleanup_not_similar">Nicht gleich</string>
+    <string name="gallery_cleanup_keep">Behalten</string>
+    <string name="gallery_cleanup_empty_title">Nichts aufzuräumen</string>
+    <string name="gallery_cleanup_empty_text">Keine Kopien oder Serien in deiner Bibliothek.</string>
+    <string name="gallery_cleanup_unsupported">Dein trunk ist dafür zu alt. Aktualisiere den Server.</string>
+    <plurals name="gallery_cleanup_same">
+        <item quantity="one">Gleiches Bild · %1$d Datei</item>
+        <item quantity="other">Gleiches Bild · %1$d Dateien</item>
+    </plurals>
+    <plurals name="gallery_cleanup_burst">
+        <item quantity="one">Serie · %1$d Aufnahme</item>
+        <item quantity="other">Serie · %1$d Aufnahmen</item>
+    </plurals>
+    <plurals name="gallery_cleanup_delete">
+        <item quantity="one">%1$d löschen</item>
+        <item quantity="other">%1$d löschen</item>
+    </plurals>
+    <plurals name="gallery_cleanup_all_text">
+        <item quantity="one">%1$d Bild kommt wie markiert in den Papierkorb auf trunk. Von dort lässt es sich wiederherstellen.</item>
+        <item quantity="other">%1$d Bilder kommen wie markiert in den Papierkorb auf trunk. Von dort lassen sie sich wiederherstellen.</item>
+    </plurals>
+    <plurals name="gallery_cleanup_pending">
+        <item quantity="one">%1$d Bild wird noch untersucht.</item>
+        <item quantity="other">%1$d Bilder werden noch untersucht.</item>
+    </plurals>
 </resources>
