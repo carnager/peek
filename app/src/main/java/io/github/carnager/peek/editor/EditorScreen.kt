@@ -352,7 +352,7 @@ private fun SaveDialog(
     var quality by remember { mutableFloatStateOf(92f) }
     val downscaled = source.originalWidth.toLong() * source.originalHeight > ImageIO.maxPixels()
 
-    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
             Text("Speichern", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text(

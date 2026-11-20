@@ -293,7 +293,8 @@ fun ImageViewer(
     }
 
     info?.let { item ->
-        ModalBottomSheet(onDismissRequest = { info = null }) {
+        // Always fully open, so one back gesture closes it instead of first halving it.
+        ModalBottomSheet(onDismissRequest = { info = null }, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             InfoSheet(item)
         }
     }

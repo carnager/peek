@@ -31,7 +31,8 @@ import io.github.carnager.peek.ui.bounceClick
 fun AddToAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () -> Unit) {
     var creating by remember { mutableStateOf(false) }
     val byId = remember(vm.images) { vm.images.associateBy { it.id } }
-    ModalBottomSheet(onDismissRequest = onDone) {
+    // Always fully open, so one back gesture closes it instead of first halving it.
+    ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Text(
                 if (ids.size == 1) "Zu Album hinzufügen" else "${ids.size} Bilder zu Album hinzufügen",
