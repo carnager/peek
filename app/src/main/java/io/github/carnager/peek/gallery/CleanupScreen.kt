@@ -97,7 +97,7 @@ fun CleanupScreen(vm: GalleryViewModel, onClose: () -> Unit) {
                         if (vm.similarPending > 0) PendingNote(vm.similarPending)
                     }
                 }
-                items(groups, key = { it.ids.first() }) { g ->
+                items(groups, key = { it.key }) { g ->
                     val images = remember(g, vm.trunk) { vm.similarImages(g) }
                     if (images.size < 2) return@items // the library has not caught up yet
                     val del = marked(g, images)
@@ -162,10 +162,19 @@ private fun GroupCard(
     Column(modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             Text(
-                if (g.burst) pluralStringResource(R.plurals.gallery_cleanup_burst, images.size, images.size)
-                else pluralStringResource(R.plurals.gallery_cleanup_same, images.size, images.size),
+                when (g.kind) {
+                    "burst" -> pluralStringResource(R.plurals.gallery_cleanup_burst, images.size, images.size)
+                    "motion" -> stringResource(R.string.gallery_cleanup_motion)
+                    else -> pluralStringResource(R.plurals.gallery_cleanup_same, images.size, images.size)
+                },
                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
             )
+            if (g.kind == "motion") {
+                Text(
+                    stringResource(R.string.gallery_cleanup_motion_text),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 DateFormat.getDateInstance(DateFormat.MEDIUM).format(images.first().dateTaken),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

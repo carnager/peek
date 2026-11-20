@@ -531,8 +531,13 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- clean-up: look-alikes on trunk ---
 
-    /** Photos that look alike: one picture in several files ([burst] false), or a burst of shots. */
-    class SimilarGroup(val ids: List<Long>, val keep: Long, val burst: Boolean)
+    /**
+     * Photos that look alike: one picture in several files ("same"), a burst of shots ("burst"), or
+     * a video that is only a copy of the video in a motion photo ("motion").
+     */
+    class SimilarGroup(val ids: List<Long>, val keep: Long, val kind: String) {
+        val key get() = ids.joinToString(",")
+    }
 
     var cleanupOpen by mutableStateOf(false)
     /** null while loading. */
@@ -561,7 +566,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 similar = List(arr.length()) { i ->
                     val g = arr.getJSONObject(i)
                     val ids = g.getJSONArray("asset_ids")
-                    SimilarGroup(List(ids.length()) { ids.getLong(it) }, g.optLong("keep"), g.optString("kind") == "burst")
+                    SimilarGroup(List(ids.length()) { ids.getLong(it) }, g.optLong("keep"), g.optString("kind"))
                 }
                 similarPending = o.optInt("pending")
             } catch (e: kotlinx.coroutines.CancellationException) {

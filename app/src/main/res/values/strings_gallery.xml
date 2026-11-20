@@ -240,4 +240,6 @@
         <item quantity="one">%1$d photo is still being analysed.</item>
         <item quantity="other">%1$d photos are still being analysed.</item>
     </plurals>
+    <string name="gallery_cleanup_motion">Video inside a photo</string>
+    <string name="gallery_cleanup_motion_text">This video is also the motion part of the photo; the photo plays it.</string>
 </resources>

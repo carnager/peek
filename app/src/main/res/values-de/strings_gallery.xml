@@ -238,4 +238,6 @@
         <item quantity="one">%1$d Bild wird noch untersucht.</item>
         <item quantity="other">%1$d Bilder werden noch untersucht.</item>
     </plurals>
+    <string name="gallery_cleanup_motion">Video steckt im Foto</string>
+    <string name="gallery_cleanup_motion_text">Dieses Video ist auch der Bewegungsteil des Fotos; das Foto spielt es ab.</string>
 </resources>
