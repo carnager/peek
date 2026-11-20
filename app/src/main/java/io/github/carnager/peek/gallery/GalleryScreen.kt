@@ -63,7 +63,7 @@ fun thumbKey(image: MediaImage, size: Int) = "thumb$size:${image.uri}#${image.mo
 
 /** What Coil loads for a thumbnail: the server renders its own for trunk photos. */
 fun MediaImage.thumbData(size: Int): Any =
-    remote?.let { io.github.carnager.peek.trunk.TrunkAccount.thumbUrl(it.id, if (size >= 480) "medium" else "small") } ?: uri
+    remote?.let { io.github.carnager.peek.trunk.TrunkAccount.thumbUrl(it, if (size >= 480) "medium" else "small") } ?: uri
 
 fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
     uri = uri,
@@ -80,7 +80,8 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
     isVideo = isVideo,
     duration = duration,
     remote = remote != null,
-    previewUrl = remote?.takeIf { !it.isVideo }?.let { io.github.carnager.peek.trunk.TrunkAccount.thumbUrl(it.id, "preview") },
+    edited = remote?.edited == true,
+    previewUrl = remote?.takeIf { !it.isVideo }?.let { io.github.carnager.peek.trunk.TrunkAccount.thumbUrl(it, "preview") },
     meta = remote?.let { r ->
         io.github.carnager.peek.viewer.PhotoMeta(
             camera = when {
@@ -183,6 +184,9 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                                 }
                             },
                             // Albums hold phone photos; server photos would need server albums.
+                            onRevertEdit = if (vm.open != Source.Trunk) null else { item ->
+                                list.firstOrNull { it.uri == item.uri }?.let { vm.trunkRevertEdit(it) }
+                            },
                             onAddToAlbum = if (vm.open == Source.Trunk) null else { item -> list.firstOrNull { it.uri == item.uri }?.let { vm.addToAlbum = listOf(it.id) } },
                             onPageChange = { if (vm.viewerIndex != null) vm.viewerIndex = it },
                         )

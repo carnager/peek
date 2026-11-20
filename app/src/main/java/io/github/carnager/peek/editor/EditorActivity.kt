@@ -46,6 +46,16 @@ class EditorActivity : ComponentActivity() {
                             done(out, "Als Kopie gespeichert")
                         }
                     },
+                    onSaveToTrunk = intent.getLongExtra(EXTRA_TRUNK_ID, 0L).takeIf { it != 0L }?.let { id ->
+                        { format, quality ->
+                            vm.runBusy {
+                                vm.saveEditToTrunk(format, quality, id)
+                                Toast.makeText(this, "Auf trunk gespeichert, das Original bleibt erhalten", Toast.LENGTH_SHORT).show()
+                                setResult(RESULT_OK)
+                                finish()
+                            }
+                        }
+                    },
                     onUploadToTrunk = intent.getLongExtra(EXTRA_TRUNK_ID, 0L).takeIf { it != 0L }?.let {
                         { format, quality ->
                             vm.runBusy {

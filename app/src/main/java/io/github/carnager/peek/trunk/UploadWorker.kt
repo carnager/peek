@@ -26,7 +26,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
-import java.security.MessageDigest
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -85,15 +84,19 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     /** Uploads one item; false when the server already had it. */
     private fun send(item: Item): Boolean {
         val ctx = applicationContext
+        // Originals are read unredacted so the location stays in the file. Their hash is what the
+        // server knows the photo by, even when a shrunk copy is what goes up.
+        val src = ImageIO.originalUri(ctx, item.uri)
+        val sha = ctx.contentResolver.openInputStream(src)!!.use { sha256(it) }
+        if (TrunkClient.check(listOf(sha)).isNotEmpty()) return false
+
         val limit = TrunkAccount.uploadLimit
         val compressible = !item.video && item.mime in setOf("image/jpeg", "image/heic", "image/heif", "image/webp")
         if (limit > 0 && compressible && item.size > limit) {
             val small = shrink(item, limit)
             try {
-                val sha = sha256(small)
-                if (TrunkClient.check(listOf(sha)).isNotEmpty()) return false
                 val name = item.name.substringBeforeLast('.') + ".jpg"
-                return TrunkClient.upload(name, item.taken, sha, "image/jpeg", small.length()) { sink ->
+                return TrunkClient.upload(name, item.taken, sha256(small), "image/jpeg", small.length(), sourceSha256 = sha) { sink ->
                     FileInputStream(small).use { input -> input.copyTo(sink.outputStream()) }
                 }
             } finally {
@@ -101,10 +104,6 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             }
         }
 
-        // Originals go up byte for byte, read unredacted so the location stays in the file.
-        val src = ImageIO.originalUri(ctx, item.uri)
-        val sha = ctx.contentResolver.openInputStream(src)!!.use { sha256(it) }
-        if (TrunkClient.check(listOf(sha)).isNotEmpty()) return false
         val length = ctx.contentResolver.openFileDescriptor(src, "r")?.use { it.statSize }?.takeIf { it > 0 } ?: item.size
         return if (item.video || length > 32L shl 20) {
             ctx.contentResolver.openFileDescriptor(src, "r")!!.use { pfd ->
@@ -168,19 +167,6 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 d.setTargetSize((info.size.width * f).roundToInt().coerceAtLeast(1), (info.size.height * f).roundToInt().coerceAtLeast(1))
             }
         }
-
-    private fun sha256(input: java.io.InputStream): String {
-        val md = MessageDigest.getInstance("SHA-256")
-        val buf = ByteArray(1 shl 16)
-        while (true) {
-            val n = input.read(buf)
-            if (n < 0) break
-            md.update(buf, 0, n)
-        }
-        return md.digest().joinToString("") { "%02x".format(it) }
-    }
-
-    private fun sha256(file: File) = FileInputStream(file).use { sha256(it) }
 
     private fun notifyDone(uploaded: Int, skipped: Int, failed: List<String>) {
         val text = buildList {

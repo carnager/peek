@@ -104,7 +104,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     private fun RemoteAsset.toImage() = MediaImage(
         // Negative ids keep server photos apart from MediaStore ones in selections and animations.
         id = -id,
-        uri = Uri.parse(TrunkAccount.originalUrl(id)),
+        uri = Uri.parse(TrunkAccount.fileUrl(this)),
         name = name,
         bucketId = Long.MIN_VALUE,
         bucketName = "trunk",
@@ -189,20 +189,28 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Downloads the originals of trunk photos (cached), then hands their local URIs to [then]. */
+    /** Downloads trunk photos (cached), then hands their local URIs to [then]. */
     fun withTrunkOriginals(images: List<MediaImage>, then: (List<Uri>) -> Unit) = trunkCall {
         val remote = images.mapNotNull { it.remote }
         if (remote.isEmpty()) return@trunkCall
         if (remote.sumOf { it.size } > 2_000_000) {
             message = Message(if (remote.size == 1) "Lade Original …" else "Lade ${remote.size} Originale …")
         }
-        val uris = remote.map { io.github.carnager.peek.trunk.TrunkFiles.original(getApplication(), it) }
+        val uris = remote.map { io.github.carnager.peek.trunk.TrunkFiles.file(getApplication(), it) }
         then(uris)
     }
 
     fun trunkFavorite(images: List<MediaImage>, favorite: Boolean) = trunkCall {
         images.mapNotNull { it.remote }.forEach { TrunkLibrary.put(getApplication(), TrunkClient.setFavorite(it.id, favorite)) }
         trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+    }
+
+    /** Back to the photo as first uploaded. */
+    fun trunkRevertEdit(image: MediaImage) = trunkCall {
+        val id = image.remote?.id ?: return@trunkCall
+        TrunkLibrary.put(getApplication(), TrunkClient.revertEdit(id))
+        trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+        message = Message("Bearbeitung verworfen, Original wiederhergestellt")
     }
 
     fun trunkTrash(images: List<MediaImage>) = trunkCall {

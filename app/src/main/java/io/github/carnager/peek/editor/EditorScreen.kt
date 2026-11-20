@@ -88,7 +88,9 @@ fun EditorScreen(
     onClose: () -> Unit,
     onSaveCopy: (SaveFormat, Int) -> Unit,
     onOverwrite: (Int) -> Unit,
-    /** Set when the photo came from trunk: the edit goes back there as a copy. */
+    /** Set when the photo came from trunk: the edit becomes its current version there. */
+    onSaveToTrunk: ((SaveFormat, Int) -> Unit)? = null,
+    /** Set when the photo came from trunk: the edit goes there as a new photo. */
     onUploadToTrunk: ((SaveFormat, Int) -> Unit)? = null,
 ) {
     var confirmDiscard by remember { mutableStateOf(false) }
@@ -237,6 +239,7 @@ fun EditorScreen(
                 onDismiss = { showSave = false },
                 onSaveCopy = { f, q -> showSave = false; onSaveCopy(f, q) },
                 onOverwrite = { q -> showSave = false; onOverwrite(q) },
+                onSaveToTrunk = onSaveToTrunk?.let { save -> { f, q -> showSave = false; save(f, q) } },
                 onUploadToTrunk = onUploadToTrunk?.let { up -> { f, q -> showSave = false; up(f, q) } },
             )
         }
@@ -349,6 +352,7 @@ private fun SaveDialog(
     onDismiss: () -> Unit,
     onSaveCopy: (SaveFormat, Int) -> Unit,
     onOverwrite: (Int) -> Unit,
+    onSaveToTrunk: ((SaveFormat, Int) -> Unit)?,
     onUploadToTrunk: ((SaveFormat, Int) -> Unit)?,
 ) {
     val originalFormat = SaveFormat.forMime(source.mimeType)
@@ -391,18 +395,22 @@ private fun SaveDialog(
                 }
             }
             Spacer(Modifier.height(20.dp))
-            if (onUploadToTrunk != null) {
+            if (onSaveToTrunk != null && onUploadToTrunk != null) {
                 Button(
+                    onClick = { onSaveToTrunk(format, quality.roundToInt()) },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                ) { Text("Auf trunk speichern", style = MaterialTheme.typography.titleSmall) }
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(
                     onClick = { onUploadToTrunk(format, quality.roundToInt()) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                 ) { Text("Als Kopie zu trunk hochladen", style = MaterialTheme.typography.titleSmall) }
-                Spacer(Modifier.height(10.dp))
-                OutlinedButton(
+                androidx.compose.material3.TextButton(
                     onClick = { onSaveCopy(format, quality.roundToInt()) },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp),
                 ) { Text("Auf dem Handy speichern", style = MaterialTheme.typography.titleSmall) }
                 Text(
-                    "Das Original auf trunk bleibt unverändert.",
+                    "trunk behält das Original. Im Betrachter lässt sich die Bearbeitung über „Mehr“ wieder verwerfen.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp).align(Alignment.CenterHorizontally),

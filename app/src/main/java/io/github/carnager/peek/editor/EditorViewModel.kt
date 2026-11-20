@@ -1,5 +1,8 @@
 package io.github.carnager.peek.editor
 
+import io.github.carnager.peek.trunk.TrunkClient
+import io.github.carnager.peek.trunk.TrunkLibrary
+import io.github.carnager.peek.trunk.sha256
 import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
@@ -166,16 +169,21 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         val bmp = current ?: error("Kein Bild")
         val file = ImageIO.encodeWithExif(getApplication(), bmp, source!!, format, quality)
         try {
-            val md = java.security.MessageDigest.getInstance("SHA-256")
-            file.inputStream().use { input ->
-                val buf = ByteArray(1 shl 16)
-                while (true) { val n = input.read(buf); if (n < 0) break; md.update(buf, 0, n) }
-            }
-            val sha = md.digest().joinToString("") { "%02x".format(it) }
             val name = originalName.substringBeforeLast('.') + "_edit." + format.ext
-            io.github.carnager.peek.trunk.TrunkClient.upload(name, taken, sha, format.mime, file.length()) { sink ->
+            TrunkClient.upload(name, taken, sha256(file), format.mime, file.length()) { sink ->
                 file.inputStream().use { it.copyTo(sink.outputStream()) }
             }
+        } finally {
+            file.delete()
+        }
+    }
+
+    /** Saves the edit as the trunk photo's current version; trunk keeps the first upload. */
+    suspend fun saveEditToTrunk(format: SaveFormat, quality: Int, id: Long) = withContext(Dispatchers.IO) {
+        val bmp = current ?: error("Kein Bild")
+        val file = ImageIO.encodeWithExif(getApplication(), bmp, source!!, format, quality)
+        try {
+            TrunkLibrary.put(getApplication(), TrunkClient.saveEdit(id, file, sha256(file), format.mime))
         } finally {
             file.delete()
         }

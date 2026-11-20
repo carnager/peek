@@ -106,7 +106,7 @@ fun VideoPage(item: ViewerItem, isCurrent: Boolean, chrome: Boolean, onTap: () -
     ) {
         val poster: @Composable () -> Unit = {
             AsyncImage(
-                model = ImageRequest.Builder(ctx).data(item.previewUrl ?: if (item.remote) item.uri.toString().replace("/original", "/thumb/preview") else item.uri).placeholderMemoryCacheKey(item.placeholderKey).build(),
+                model = ImageRequest.Builder(ctx).data(item.previewUrl ?: if (item.remote) item.uri.toString().replace("/file", "/thumb/preview") else item.uri).placeholderMemoryCacheKey(item.placeholderKey).build(),
                 contentDescription = item.name,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),

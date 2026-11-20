@@ -56,14 +56,30 @@ object TrunkAccount {
     }
 
     fun api(path: String) = "${baseUrl}/api/v1$path"
-    fun thumbUrl(id: Long, size: String) = api("/assets/$id/thumb/$size")
-    fun originalUrl(id: Long) = api("/assets/$id/original")
+    // The content hash in the URL changes when a photo is edited, so Coil's caches never show the old pixels.
+    fun thumbUrl(a: RemoteAsset, size: String) = api("/assets/${a.id}/thumb/$size?v=${a.version}")
+    /** The current file: the edit, if there is one. */
+    fun fileUrl(a: RemoteAsset) = api("/assets/${a.id}/file?v=${a.version}")
 
     /** Whether a request goes to our server, so the token may be attached. */
     fun owns(url: String): Boolean = baseUrl?.let { url.startsWith("$it/") } ?: false
 }
 
 class TrunkException(val status: Int, message: String) : IOException(message)
+
+/** Hex SHA-256, the hash trunk identifies files by. */
+fun sha256(input: java.io.InputStream): String {
+    val md = java.security.MessageDigest.getInstance("SHA-256")
+    val buf = ByteArray(1 shl 16)
+    while (true) {
+        val n = input.read(buf)
+        if (n < 0) break
+        md.update(buf, 0, n)
+    }
+    return md.digest().joinToString("") { "%02x".format(it) }
+}
+
+fun sha256(file: java.io.File): String = file.inputStream().use { sha256(it) }
 
 /** One asset as the server describes it. See trunk's docs/api.md for the conventions. */
 data class RemoteAsset(
@@ -92,10 +108,17 @@ data class RemoteAsset(
     val durationMs: Long,
     val favorite: Boolean,
     val trashed: Boolean,
+    /** Hash of the current file. */
+    val sha256: String,
+    /** Edited on trunk; the first upload is kept and can be restored. */
+    val edited: Boolean,
     val updatedAt: String?,
     val json: JSONObject,
 ) {
     val isVideo get() = kind == "video"
+
+    /** Short tag for cache-busting URLs. */
+    val version get() = sha256.take(12)
 
     /** [localTime] read as a time in the phone's zone, so date formatting shows the wall clock it was taken at. */
     val displayMillis: Long
@@ -123,6 +146,8 @@ data class RemoteAsset(
                 durationMs = o.optLong("duration_ms"),
                 favorite = o.optBoolean("favorite"),
                 trashed = s("trashed_at") != null,
+                sha256 = s("sha256") ?: "",
+                edited = s("edited_at") != null,
                 updatedAt = s("updated_at"),
                 json = o,
             )
@@ -218,8 +243,11 @@ object TrunkClient {
         return ex.keys().asSequence().associateWith { ex.getLong(it) }
     }
 
-    /** Simple upload of a whole file. Returns whether the server created a new asset. */
-    fun upload(name: String, mtime: Long, sha256: String, mime: String, length: Long, write: (BufferedSink) -> Unit): Boolean {
+    /**
+     * Simple upload of a whole file. Returns whether the server created a new asset. [sourceSha256] is the
+     * hash of the phone's file when [sha256] belongs to a shrunk copy of it.
+     */
+    fun upload(name: String, mtime: Long, sha256: String, mime: String, length: Long, sourceSha256: String? = null, write: (BufferedSink) -> Unit): Boolean {
         val body = object : RequestBody() {
             override fun contentType() = mime.toMediaType()
             override fun contentLength() = length
@@ -228,9 +256,25 @@ object TrunkClient {
         val full = TrunkAccount.api("/assets").toHttpUrl().newBuilder()
             .addQueryParameter("filename", name)
             .addQueryParameter("mtime", mtime.toString())
+            .apply { if (sourceSha256 != null) addQueryParameter("source_sha256", sourceSha256) }
             .build()
         val res = call(Request.Builder().url(full).header("X-Sha256", sha256).post(body).build())
         return res.optBoolean("created")
+    }
+
+    /** Stores [file] as the edited version of asset [id]; trunk keeps the first upload. Returns the updated asset. */
+    suspend fun saveEdit(id: Long, file: java.io.File, sha256: String, mime: String): JSONObject = withContext(Dispatchers.IO) {
+        val body = object : RequestBody() {
+            override fun contentType() = mime.toMediaType()
+            override fun contentLength() = file.length()
+            override fun writeTo(sink: BufferedSink) { file.inputStream().use { it.copyTo(sink.outputStream()) } }
+        }
+        call(Request.Builder().url(TrunkAccount.api("/assets/$id/edit")).header("X-Sha256", sha256).put(body).build())
+    }
+
+    /** Drops the edit; the photo shows its first upload again. Returns the updated asset. */
+    suspend fun revertEdit(id: Long): JSONObject = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/assets/$id/edit")).delete().build())
     }
 
     /**

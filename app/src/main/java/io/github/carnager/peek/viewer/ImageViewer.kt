@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Wallpaper
@@ -120,8 +121,10 @@ data class ViewerItem(
     val isVideo: Boolean = false,
     /** Video length in ms. */
     val duration: Long = 0,
-    /** Lives on the trunk server: no editing or sharing, metadata comes from the server. */
+    /** Lives on the trunk server: metadata comes from the server. */
     val remote: Boolean = false,
+    /** Edited on trunk, so the edit can be dropped again. */
+    val edited: Boolean = false,
     /** A screen-sized rendition to show instead of loading [uri] in full. */
     val previewUrl: String? = null,
     /** Metadata already known (from the server), so the info sheet need not read the file. */
@@ -143,6 +146,8 @@ fun ImageViewer(
     onAddToAlbum: ((ViewerItem) -> Unit)? = null,
     /** Replaces the built-in share, e.g. to fetch a server original first. */
     onShare: ((ViewerItem) -> Unit)? = null,
+    /** Offered for [ViewerItem.edited] items: go back to the first upload. */
+    onRevertEdit: ((ViewerItem) -> Unit)? = null,
 ) {
     if (items.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
@@ -278,6 +283,13 @@ fun ImageViewer(
                                 text = { Text("Zu Album hinzufügen") },
                                 leadingIcon = { Icon(Icons.Rounded.PhotoAlbum, null) },
                                 onClick = { menu = false; onAddToAlbum(current) },
+                            )
+                        }
+                        if (onRevertEdit != null && current.edited) {
+                            DropdownMenuItem(
+                                text = { Text("Bearbeitung verwerfen") },
+                                leadingIcon = { Icon(Icons.Rounded.Restore, null) },
+                                onClick = { menu = false; onRevertEdit(current) },
                             )
                         }
                         DropdownMenuItem(
