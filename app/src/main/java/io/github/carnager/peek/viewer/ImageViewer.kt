@@ -120,6 +120,12 @@ data class ViewerItem(
     val isVideo: Boolean = false,
     /** Video length in ms. */
     val duration: Long = 0,
+    /** Lives on the trunk server: no editing or sharing, metadata comes from the server. */
+    val remote: Boolean = false,
+    /** A screen-sized rendition to show instead of loading [uri] in full. */
+    val previewUrl: String? = null,
+    /** Metadata already known (from the server), so the info sheet need not read the file. */
+    val meta: PhotoMeta? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -218,7 +224,7 @@ fun ImageViewer(
             Box(Modifier.fillMaxSize()) {
                 ZoomableAsyncImage(
                     model = coil3.request.ImageRequest.Builder(ctx)
-                        .data(item.uri)
+                        .data(item.previewUrl ?: item.uri)
                         .memoryCacheKey("${item.uri}#${item.version}")
                         .placeholderMemoryCacheKey(item.placeholderKey)
                         .build(),
@@ -297,11 +303,11 @@ fun ImageViewer(
                         .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    PillIcon(Icons.Rounded.Share, "Teilen") { share(ctx, listOf(current.uri), current.mimeType) }
+                    if (!current.remote) PillIcon(Icons.Rounded.Share, "Teilen") { share(ctx, listOf(current.uri), current.mimeType) }
                     if (onFavorite != null) {
                         FavoriteIcon(current.favorite) { onFavorite(current) }
                     }
-                    if (!current.isVideo) PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
+                    if (!current.isVideo && !current.remote) PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
                     if (onDelete != null) PillIcon(Icons.Rounded.DeleteOutline, "Löschen") { onDelete(current) }
                     PillIcon(Icons.Rounded.Info, "Info") { info = current }
                 }

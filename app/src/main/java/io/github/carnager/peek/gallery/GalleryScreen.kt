@@ -61,6 +61,10 @@ import kotlin.math.roundToInt
 fun thumbSize(columns: Int) = if (columns <= 3) 480 else 300
 fun thumbKey(image: MediaImage, size: Int) = "thumb$size:${image.uri}#${image.modified}"
 
+/** What Coil loads for a thumbnail: the server renders its own for trunk photos. */
+fun MediaImage.thumbData(size: Int): Any =
+    remote?.let { io.github.carnager.peek.trunk.TrunkAccount.thumbUrl(it.id, if (size >= 480) "medium" else "small") } ?: uri
+
 fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
     uri = uri,
     name = name,
@@ -75,6 +79,25 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
     favorite = isFavorite,
     isVideo = isVideo,
     duration = duration,
+    remote = remote != null,
+    previewUrl = remote?.takeIf { !it.isVideo }?.let { io.github.carnager.peek.trunk.TrunkAccount.thumbUrl(it.id, "preview") },
+    meta = remote?.let { r ->
+        io.github.carnager.peek.viewer.PhotoMeta(
+            camera = when {
+                r.model == null -> r.make
+                r.make == null || r.model.startsWith(r.make, ignoreCase = true) -> r.model
+                else -> "${r.make} ${r.model}"
+            },
+            lens = r.lens,
+            aperture = r.fNumber,
+            exposure = r.exposure,
+            iso = r.iso,
+            focal = r.focalLength,
+            lat = r.lat,
+            lon = r.lon,
+            altitude = r.alt,
+        )
+    },
 )
 
 @Composable
@@ -141,9 +164,16 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                                 vm.viewerIndex = null
                             },
                             onEdit = { ops.edit(it.uri) },
-                            onDelete = { item -> list.firstOrNull { it.uri == item.uri }?.let { ops.trash(listOf(it)) } },
-                            onFavorite = { item -> list.firstOrNull { it.uri == item.uri }?.let { ops.setFavorite(listOf(it), !it.isFavorite) } },
-                            onAddToAlbum = { item -> list.firstOrNull { it.uri == item.uri }?.let { vm.addToAlbum = listOf(it.id) } },
+                            onDelete = { item ->
+                                list.firstOrNull { it.uri == item.uri }?.let { if (it.remote != null) vm.trunkTrash(listOf(it)) else ops.trash(listOf(it)) }
+                            },
+                            onFavorite = { item ->
+                                list.firstOrNull { it.uri == item.uri }?.let {
+                                    if (it.remote != null) vm.trunkFavorite(listOf(it), !it.isFavorite) else ops.setFavorite(listOf(it), !it.isFavorite)
+                                }
+                            },
+                            // Albums hold phone photos; server photos would need server albums.
+                            onAddToAlbum = if (vm.open == Source.Trunk) null else { item -> list.firstOrNull { it.uri == item.uri }?.let { vm.addToAlbum = listOf(it.id) } },
                             onPageChange = { if (vm.viewerIndex != null) vm.viewerIndex = it },
                         )
                     }
@@ -165,7 +195,7 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                 val size = thumbSize(vm.columns)
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(hero.image.uri)
+                        .data(hero.image.thumbData(size))
                         .memoryCacheKey(thumbKey(hero.image, size))
                         .placeholderMemoryCacheKey(thumbKey(hero.image, size))
                         .size(size)
@@ -234,6 +264,8 @@ private fun closeHero(vm: GalleryViewModel, list: List<MediaImage>, w: Float, h:
 private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridState) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var creating by remember { mutableStateOf(false) }
+    var connecting by remember { mutableStateOf(false) }
+    val upload = rememberUploadProgress(vm)
     // Re-checked on every recomposition, so returning from the settings page updates it.
     var canManage by remember { mutableStateOf(ops.canManageMedia) }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
@@ -293,6 +325,9 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
                 }
             }
 
+            item(key = "trunk", span = { GridItemSpan(maxLineSpan) }) {
+                TrunkCard(vm, upload) { if (vm.trunkConnected) vm.open = Source.Trunk else connecting = true }
+            }
             item(key = "albumsHeader", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader("Alben") {
                     FilledTonalButton(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
@@ -334,6 +369,9 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
             creating = false
             vm.open = Source.User(vm.createAlbum(name).id)
         }
+    }
+    if (connecting) {
+        TrunkConnectDialog(vm, onDone = { connecting = false; if (vm.trunkConnected) vm.open = Source.Trunk })
     }
 }
 
@@ -441,7 +479,7 @@ fun Thumb(image: MediaImage, modifier: Modifier, size: Int = 300) {
     val ctx = LocalContext.current
     AsyncImage(
         model = ImageRequest.Builder(ctx)
-            .data(image.uri)
+            .data(image.thumbData(size))
             .memoryCacheKey(thumbKey(image, size))
             .size(size)
             .crossfade(true)

@@ -66,7 +66,13 @@ fun VideoPage(item: ViewerItem, isCurrent: Boolean, chrome: Boolean, onTap: () -
 
     LaunchedEffect(isCurrent) {
         if (isCurrent && player == null) {
-            player = ExoPlayer.Builder(ctx).build().apply {
+            // Server videos need the trunk token; DefaultDataSource still handles content:// for local ones.
+            val http = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+            io.github.carnager.peek.trunk.TrunkAccount.token
+                ?.takeIf { io.github.carnager.peek.trunk.TrunkAccount.owns(item.uri.toString()) }
+                ?.let { http.setDefaultRequestProperties(mapOf("Authorization" to "Bearer $it")) }
+            val sources = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(androidx.media3.datasource.DefaultDataSource.Factory(ctx, http))
+            player = ExoPlayer.Builder(ctx).setMediaSourceFactory(sources).build().apply {
                 setMediaItem(MediaItem.fromUri(item.uri))
                 addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
@@ -100,7 +106,7 @@ fun VideoPage(item: ViewerItem, isCurrent: Boolean, chrome: Boolean, onTap: () -
     ) {
         val poster: @Composable () -> Unit = {
             AsyncImage(
-                model = ImageRequest.Builder(ctx).data(item.uri).placeholderMemoryCacheKey(item.placeholderKey).build(),
+                model = ImageRequest.Builder(ctx).data(item.previewUrl ?: if (item.remote) item.uri.toString().replace("/original", "/thumb/preview") else item.uri).placeholderMemoryCacheKey(item.placeholderKey).build(),
                 contentDescription = item.name,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),

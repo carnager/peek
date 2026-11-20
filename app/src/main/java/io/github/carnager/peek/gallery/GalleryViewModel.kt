@@ -8,6 +8,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.carnager.peek.trunk.RemoteAsset
+import io.github.carnager.peek.trunk.TrunkAccount
+import io.github.carnager.peek.trunk.TrunkClient
+import io.github.carnager.peek.trunk.TrunkException
+import io.github.carnager.peek.trunk.TrunkLibrary
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.ensureActive
@@ -20,6 +25,8 @@ sealed interface Source {
     data object Trash : Source
     data class Folder(val bucketId: Long) : Source
     data class User(val id: String) : Source
+    /** The library on the trunk server. */
+    data object Trunk : Source
 }
 
 /** A short message with an optional action, shown as a snackbar. */
@@ -85,6 +92,117 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     val favorites: List<MediaImage> get() = images.filter { it.isFavorite }
 
+    // --- trunk ---
+
+    var trunk by mutableStateOf<List<MediaImage>>(emptyList())
+        private set
+    var trunkSyncing by mutableStateOf(false)
+        private set
+    var trunkConnected by mutableStateOf(TrunkAccount.connected)
+        private set
+
+    private fun RemoteAsset.toImage() = MediaImage(
+        // Negative ids keep server photos apart from MediaStore ones in selections and animations.
+        id = -id,
+        uri = Uri.parse(TrunkAccount.originalUrl(id)),
+        name = name,
+        bucketId = Long.MIN_VALUE,
+        bucketName = "trunk",
+        relativePath = null,
+        mimeType = mime,
+        width = width,
+        height = height,
+        size = size,
+        dateTaken = displayMillis,
+        modified = (updatedAt ?: "").hashCode().toLong(),
+        isFavorite = favorite,
+        isVideo = isVideo,
+        duration = durationMs,
+        remote = this,
+    )
+
+    /** Shows the cached library at once, then asks the server what changed. */
+    fun openTrunk() {
+        viewModelScope.launch {
+            trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+            syncTrunk()
+        }
+    }
+
+    fun syncTrunk() {
+        if (!TrunkAccount.connected || trunkSyncing) return
+        viewModelScope.launch {
+            trunkSyncing = true
+            try {
+                trunk = TrunkLibrary.sync(getApplication()).map { it.toImage() }
+                viewerIndex?.let { i -> if (open == Source.Trunk) viewerIndex = if (trunk.isEmpty()) null else i.coerceAtMost(trunk.lastIndex) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                message = Message("trunk nicht erreichbar: ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                trunkSyncing = false
+            }
+        }
+    }
+
+    /** Logs in; [done] gets null on success or the error to show. */
+    fun trunkConnect(address: String, user: String, password: String, done: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                TrunkLibrary.clear(getApplication())
+                TrunkClient.login(getApplication(), address, user, password)
+                trunkConnected = true
+                done(null)
+                openTrunk()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: TrunkException) {
+                done(if (e.status == 401) "Name oder Passwort stimmt nicht" else e.message)
+            } catch (e: Exception) {
+                done("Server nicht erreichbar: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    fun trunkLogout() {
+        viewModelScope.launch {
+            TrunkClient.logout(getApplication())
+            TrunkLibrary.clear(getApplication())
+            trunkConnected = false
+            trunk = emptyList()
+            if (open == Source.Trunk) open = null
+        }
+    }
+
+    private fun trunkCall(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                message = Message("trunk: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    fun trunkFavorite(images: List<MediaImage>, favorite: Boolean) = trunkCall {
+        images.mapNotNull { it.remote }.forEach { TrunkLibrary.put(getApplication(), TrunkClient.setFavorite(it.id, favorite)) }
+        trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+    }
+
+    fun trunkTrash(images: List<MediaImage>) = trunkCall {
+        val ids = images.mapNotNull { it.remote?.id }
+        if (ids.isEmpty()) return@trunkCall
+        TrunkClient.trash(ids)
+        selection = emptySet()
+        syncTrunk()
+        message = Message(if (ids.size == 1) "1 Bild in trunks Papierkorb" else "${ids.size} Bilder in trunks Papierkorb", "Rückgängig") {
+            trunkCall { TrunkClient.restore(ids); syncTrunk() }
+        }
+    }
+
     fun imagesOf(source: Source?): List<MediaImage> = when (source) {
         null -> emptyList()
         Source.All -> images
@@ -95,6 +213,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             val ids = userAlbums.firstOrNull { it.id == source.id }?.ids?.toHashSet() ?: emptySet()
             images.filter { it.id in ids }
         }
+        Source.Trunk -> trunk
     }
 
     val openImages: List<MediaImage> get() = imagesOf(open)
@@ -106,6 +225,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         Source.Trash -> "Papierkorb"
         is Source.Folder -> folders.firstOrNull { it.bucketId == source.bucketId }?.name ?: ""
         is Source.User -> userAlbums.firstOrNull { it.id == source.id }?.name ?: ""
+        Source.Trunk -> "trunk"
     }
 
     fun reload(then: (() -> Unit)? = null) {

@@ -10,6 +10,9 @@ interface MediaOps {
     fun setFavorite(images: List<MediaImage>, favorite: Boolean)
     fun edit(uri: Uri)
 
+    /** Queues photos and videos for upload to trunk, asking for what the upload needs first. */
+    fun uploadToTrunk(images: List<MediaImage>)
+
     /** With "media management" granted, the above run without a confirmation dialog each time. */
     val canManageMedia: Boolean
     fun requestManageMedia()

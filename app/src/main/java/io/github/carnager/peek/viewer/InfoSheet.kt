@@ -139,13 +139,13 @@ fun InfoSheet(item: ViewerItem) {
     val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
     LaunchedEffect(Unit) {
         val prefs = ctx.getSharedPreferences("gallery", 0)
-        if (!granted && !item.isVideo && !prefs.getBoolean("askedMediaLocation", false)) {
+        if (item.meta == null && !granted && !item.isVideo && !prefs.getBoolean("askedMediaLocation", false)) {
             prefs.edit().putBoolean("askedMediaLocation", true).apply()
             askLocation.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
         }
     }
     val meta by produceState(PhotoMeta(), item.uri, granted) {
-        value = if (item.isVideo) PhotoMeta() else withContext(Dispatchers.IO) { readMeta(ctx, item.uri) }
+        value = item.meta ?: if (item.isVideo) PhotoMeta() else withContext(Dispatchers.IO) { readMeta(ctx, item.uri) }
     }
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
@@ -235,7 +235,7 @@ fun InfoSheet(item: ViewerItem) {
                     }
                 }
             }
-        } else if (!granted && !item.isVideo) {
+        } else if (item.meta == null && !granted && !item.isVideo) {
             Card {
                 Row(
                     Modifier.fillMaxWidth().bounceClick(pressedScale = 0.97f) { askLocation.launch(Manifest.permission.ACCESS_MEDIA_LOCATION) },

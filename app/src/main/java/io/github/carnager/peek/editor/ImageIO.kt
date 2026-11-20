@@ -91,14 +91,35 @@ object ImageIO {
         ExifInterface.TAG_GPS_TIMESTAMP, ExifInterface.TAG_GPS_DATESTAMP,
     )
 
-    private fun readExif(context: Context, uri: Uri): Map<String, String> = runCatching {
-        context.contentResolver.openInputStream(uri)?.use { input ->
+    /**
+     * The unredacted file: Android strips GPS from MediaStore reads unless the app asks for the
+     * original, which needs ACCESS_MEDIA_LOCATION. Without it this is just [uri].
+     */
+    fun originalUri(context: Context, uri: Uri): Uri {
+        if (uri.authority != MediaStore.AUTHORITY) return uri
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_MEDIA_LOCATION) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        return if (granted) runCatching { MediaStore.setRequireOriginal(uri) }.getOrDefault(uri) else uri
+    }
+
+    internal fun readExif(context: Context, uri: Uri): Map<String, String> = runCatching {
+        context.contentResolver.openInputStream(originalUri(context, uri))?.use { input ->
             val exif = ExifInterface(input)
             exifTags.mapNotNull { tag -> exif.getAttribute(tag)?.let { tag to it } }.toMap()
         }
     }.getOrNull().orEmpty()
 
     /** Encodes into a cache file and carries over the source's EXIF data (for JPEG). */
+    /** Writes [exif] into a JPEG file, marking it upright since the pixels already are. */
+    internal fun writeExif(file: File, exif: Map<String, String>) {
+        runCatching {
+            val out = ExifInterface(file)
+            exif.forEach { (k, v) -> out.setAttribute(k, v) }
+            out.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+            out.saveAttributes()
+        }
+    }
+
     private fun encode(context: Context, bitmap: Bitmap, format: SaveFormat, quality: Int, exif: Map<String, String>): File {
         val tmp = File.createTempFile("peek_", ".${format.ext}", context.cacheDir)
         tmp.outputStream().buffered().use { bitmap.compress(format.compress, if (format.lossy) quality else 100, it) }

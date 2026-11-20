@@ -61,6 +61,17 @@ class MainActivity : ComponentActivity() {
         mediaRequest.launch(IntentSenderRequest.Builder(pi.intentSender).build())
     }
 
+    private var pendingUpload: List<MediaImage> = emptyList()
+    private val uploadPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startUpload() }
+
+    private fun startUpload() {
+        val images = pendingUpload
+        pendingUpload = emptyList()
+        if (images.isEmpty()) return
+        io.github.carnager.peek.trunk.UploadWorker.enqueue(this, images)
+        vm.message = Message(if (images.size == 1) "1 Datei wird zu trunk hochgeladen" else "${images.size} Dateien werden zu trunk hochgeladen")
+    }
+
     private fun plural(n: Int) = if (n == 1) "1 Bild" else "$n Bilder"
 
     private val ops = object : MediaOps {
@@ -101,6 +112,17 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun edit(uri: Uri) = editor.launch(EditorActivity.intent(this@MainActivity, uri))
+
+        override fun uploadToTrunk(images: List<MediaImage>) {
+            if (images.isEmpty()) return
+            pendingUpload = images
+            // Notifications show the progress; media location keeps GPS in the uploaded files.
+            val wanted = buildList {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+                add(Manifest.permission.ACCESS_MEDIA_LOCATION)
+            }.filter { ContextCompat.checkSelfPermission(this@MainActivity, it) != PackageManager.PERMISSION_GRANTED }
+            if (wanted.isEmpty()) startUpload() else uploadPermissions.launch(wanted.toTypedArray())
+        }
 
         override val canManageMedia: Boolean
             get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && MediaStore.canManageMedia(this@MainActivity)

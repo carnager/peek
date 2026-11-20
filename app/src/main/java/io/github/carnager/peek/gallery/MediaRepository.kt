@@ -27,6 +27,8 @@ data class MediaImage(
     val isVideo: Boolean = false,
     /** Video length in ms. */
     val duration: Long = 0,
+    /** Set for photos that live on the trunk server rather than on the phone. */
+    val remote: io.github.carnager.peek.trunk.RemoteAsset? = null,
 )
 
 data class Album(

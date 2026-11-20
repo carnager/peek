@@ -24,6 +24,9 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -223,8 +226,11 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val isTrash = source == Source.Trash
+    val isTrunk = source == Source.Trunk
+    var limitDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(source) { if (isTrunk) vm.openTrunk() }
     val userAlbum = (source as? Source.User)?.let { s -> vm.userAlbums.firstOrNull { it.id == s.id } }
-    val list = remember(vm.images, vm.trash, vm.userAlbums, source) { vm.imagesOf(source) }
+    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, source) { vm.imagesOf(source) }
     val cells = remember(list, isTrash) { cellsOf(list, headers = !isTrash) }
     val latestCells by rememberUpdatedState(cells)
     val selecting = vm.selection.isNotEmpty()
@@ -278,6 +284,27 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                 actions = {
                     if (selecting) {
                         IconButton(onClick = { vm.selection = list.mapTo(HashSet()) { it.id } }) { Icon(Icons.Rounded.SelectAll, "Alle auswählen") }
+                    } else if (isTrunk) {
+                        if (vm.trunkSyncing) {
+                            CircularProgressIndicator(Modifier.padding(12.dp).size(22.dp), strokeWidth = 2.5.dp)
+                        } else {
+                            IconButton(onClick = vm::syncTrunk) { Icon(Icons.Rounded.Refresh, "Aktualisieren") }
+                        }
+                        Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Mehr") }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
+                                DropdownMenuItem(
+                                    text = { Text("Upload-Größe") },
+                                    leadingIcon = { Icon(Icons.Rounded.Compress, null) },
+                                    onClick = { menu = false; limitDialog = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Abmelden") },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Logout, null) },
+                                    onClick = { menu = false; vm.trunkLogout() },
+                                )
+                            }
+                        }
                     } else if (isTrash && list.isNotEmpty()) {
                         TextButton(onClick = { confirmEmpty = true }) { Text("Leeren") }
                     } else if (userAlbum != null) {
@@ -384,8 +411,17 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                 modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 20.dp),
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, shadowElevation = 8.dp) {
-                    Row(Modifier.padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (isTrash) {
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (isTrunk) {
+                            val allFav = selected.isNotEmpty() && selected.all { it.isFavorite }
+                            PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) "Kein Fav." else "Favorit") {
+                                vm.trunkFavorite(selected, !allFav)
+                            }
+                            PillAction(Icons.Rounded.DeleteOutline, "Löschen") { vm.trunkTrash(selected) }
+                        } else if (isTrash) {
                             PillAction(Icons.Rounded.RestoreFromTrash, "Wiederherstellen") { ops.restore(selected) }
                             PillAction(Icons.Rounded.DeleteForever, "Löschen") { ops.deleteForever(selected) }
                         } else {
@@ -402,6 +438,12 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                                 ops.setFavorite(selected, !allFav)
                             }
                             PillAction(Icons.Rounded.PhotoAlbum, "Album") { vm.addToAlbum = selected.map { it.id } }
+                            if (vm.trunkConnected) {
+                                PillAction(Icons.Rounded.CloudUpload, "trunk") {
+                                    ops.uploadToTrunk(selected)
+                                    vm.selection = emptySet()
+                                }
+                            }
                             if (userAlbum != null) {
                                 PillAction(Icons.Rounded.RemoveCircleOutline, "Entfernen") {
                                     vm.removeFrom(userAlbum.id, selected.map { it.id })
@@ -416,6 +458,7 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
         }
     }
 
+    if (limitDialog) UploadLimitDialog { limitDialog = false }
     if (renaming && userAlbum != null) {
         NameDialog("Album umbenennen", userAlbum.name, "Speichern", onDismiss = { renaming = false }) {
             vm.renameAlbum(userAlbum.id, it)
