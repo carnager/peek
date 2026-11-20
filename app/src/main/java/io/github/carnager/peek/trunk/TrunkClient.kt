@@ -61,6 +61,8 @@ object TrunkAccount {
     fun thumbUrl(a: RemoteAsset, size: String) = api("/assets/${a.id}/thumb/$size?v=${a.version}")
     /** The current file: the edit, if there is one. */
     fun fileUrl(a: RemoteAsset) = api("/assets/${a.id}/file?v=${a.version}")
+    /** A motion photo's video. */
+    fun motionUrl(a: RemoteAsset) = api("/assets/${a.id}/motion?v=${a.version}")
 
     /** Full address of a public link from its "path". */
     fun linkUrl(path: String) = "$baseUrl$path"
@@ -115,6 +117,8 @@ data class RemoteAsset(
     /** In trunk's trash: since when, and when it is deleted for good (ms), else 0. */
     val trashedAt: Long = 0,
     val trashExpiresAt: Long = 0,
+    /** A motion photo: [TrunkAccount.motionUrl] plays its video. */
+    val motion: Boolean = false,
     /** Hash of the current file. */
     val sha256: String,
     /** Edited on trunk; the first upload is kept and can be restored. */
@@ -178,6 +182,7 @@ data class RemoteAsset(
                 trashed = s("trashed_at") != null,
                 trashedAt = s("trashed_at")?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0,
                 trashExpiresAt = s("trash_expires_at")?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0,
+                motion = o.optBoolean("motion"),
                 sha256 = s("sha256") ?: "",
                 edited = s("edited_at") != null,
                 updatedAt = s("updated_at"),

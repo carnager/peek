@@ -97,8 +97,8 @@ private fun dayLabel(ms: Long, now: Calendar, today: String, yesterday: String):
         DateUtils.isToday(ms) -> today
         DateUtils.isToday(ms + DateUtils.DAY_IN_MILLIS) -> yesterday
         now.timeInMillis - ms < 6 * DateUtils.DAY_IN_MILLIS -> SimpleDateFormat("EEEE", Locale.getDefault()).format(c.time)
-        c.get(Calendar.YEAR) == now.get(Calendar.YEAR) -> SimpleDateFormat("EEE, d. MMMM", Locale.getDefault()).format(c.time)
-        else -> SimpleDateFormat("d. MMMM yyyy", Locale.getDefault()).format(c.time)
+        c.get(Calendar.YEAR) == now.get(Calendar.YEAR) -> SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEdMMMM"), Locale.getDefault()).format(c.time)
+        else -> SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "dMMMMyyyy"), Locale.getDefault()).format(c.time)
     }
 }
 
@@ -538,7 +538,7 @@ fun PhotoGridScreen(
                 grid = grid,
                 labelAt = { idx ->
                     val photo = cells.subList((idx - offset).coerceIn(0, cells.lastIndex), cells.size).firstOrNull { it is Cell.Photo } as? Cell.Photo
-                    photo?.let { SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(it.image.dateTaken) } ?: ""
+                    photo?.let { SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "MMMMyyyy"), Locale.getDefault()).format(it.image.dateTaken) } ?: ""
                 },
                 count = cells.size + offset,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = pad.calculateTopPadding(), bottom = pad.calculateBottomPadding() + 24.dp),

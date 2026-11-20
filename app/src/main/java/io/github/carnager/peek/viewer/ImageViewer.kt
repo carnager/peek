@@ -1,5 +1,9 @@
 package io.github.carnager.peek.viewer
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.rounded.MotionPhotosPause
+import androidx.compose.material.icons.rounded.MotionPhotosOn
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -135,6 +139,8 @@ data class ViewerItem(
     val previewUrl: String? = null,
     /** Metadata already known (from the server), so the info sheet need not read the file. */
     val meta: PhotoMeta? = null,
+    /** A motion photo on trunk: its video. Photos on the phone are looked at in the viewer. */
+    val motionUrl: String? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -217,6 +223,25 @@ fun ImageViewer(
                 },
             )
     ) {
+        // Motion photos: the video of the photo on screen, while it plays.
+        var motionPlaying by remember { mutableStateOf<android.net.Uri?>(null) }
+        val shownItem = items[pager.currentPage.coerceIn(0, items.lastIndex)]
+        LaunchedEffect(pager.currentPage) { motionPlaying = null }
+        // Where its video is: trunk says so; a photo on the phone is looked at (its header only).
+        val motionLocal by produceState<LongArray?>(null, shownItem.uri, shownItem.version) {
+            value = if (!shownItem.remote && !shownItem.isVideo && shownItem.mimeType == "image/jpeg") {
+                MotionPhotos.find(ctx, shownItem.uri, shownItem.version)
+            } else null
+        }
+        val hasMotion = shownItem.motionUrl != null || motionLocal != null
+        val playMotion: () -> Unit = {
+            val local = motionLocal
+            if (shownItem.motionUrl != null) {
+                motionPlaying = android.net.Uri.parse(shownItem.motionUrl)
+            } else if (local != null) {
+                scope.launch { motionPlaying = MotionPhotos.extract(ctx, shownItem.uri, shownItem.version, local) }
+            }
+        }
         HorizontalPager(
             state = pager,
             beyondViewportPageCount = 1,
@@ -255,6 +280,10 @@ fun ImageViewer(
                 if (!state.isImageDisplayed) {
                     CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.align(Alignment.Center).size(36.dp))
                 }
+                val playing = motionPlaying
+                if (page == pager.currentPage && playing != null) {
+                    MotionOverlay(playing) { motionPlaying = null }
+                }
             }
         }
 
@@ -280,6 +309,13 @@ fun ImageViewer(
                     if (items.size > 1) {
                         Text(stringResource(R.string.view_position, pager.currentPage + 1, items.size), color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
                     }
+                }
+                if (hasMotion) {
+                    GlassButton(
+                        if (motionPlaying != null) Icons.Rounded.MotionPhotosPause else Icons.Rounded.MotionPhotosOn,
+                        stringResource(R.string.view_motion),
+                    ) { if (motionPlaying != null) motionPlaying = null else playMotion() }
+                    Spacer(Modifier.width(8.dp))
                 }
                 Box {
                     GlassButton(Icons.Rounded.MoreVert, stringResource(R.string.view_more)) { menu = true }

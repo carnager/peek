@@ -99,6 +99,7 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
     edited = remote?.edited == true,
     owner = remote?.owner,
     previewUrl = remote?.takeIf { !it.isVideo }?.let { io.github.carnager.peek.trunk.TrunkAccount.thumbUrl(it, "preview") },
+    motionUrl = remote?.takeIf { it.motion }?.let { io.github.carnager.peek.trunk.TrunkAccount.motionUrl(it) },
     meta = remote?.let { r ->
         io.github.carnager.peek.viewer.PhotoMeta(
             camera = when {

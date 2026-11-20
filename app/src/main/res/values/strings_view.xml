@@ -156,4 +156,5 @@
     <string name="view_location_hidden">Location hidden</string>
     <string name="view_location_hint">Tap to let peek read location data in photos.</string>
     <string name="view_edited_with">Edited with %1$s</string>
+    <string name="view_motion">Play motion</string>
 </resources>
