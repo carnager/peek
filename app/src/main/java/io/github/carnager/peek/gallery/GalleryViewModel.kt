@@ -1,5 +1,6 @@
 package io.github.carnager.peek.gallery
 
+import android.provider.MediaStore
 import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -587,6 +588,30 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         Source.TrunkTrash -> str(R.string.gallery_trunk_trash)
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.title(getApplication()) ?: ""
         is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.title(getApplication<Application>().resources) ?: str(R.string.gallery_memories)
+    }
+
+    // Android registers a new or restored photo a moment after the camera or trash is done with
+    // it, often after peek has already reloaded. So peek watches the media index and reloads
+    // whenever it changes, like other galleries, a short while after the last change.
+    private var changeJob: kotlinx.coroutines.Job? = null
+    private val mediaObserver = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            if (!loaded) return // nothing shown yet, or no access
+            changeJob?.cancel()
+            changeJob = viewModelScope.launch {
+                kotlinx.coroutines.delay(400)
+                reload()
+            }
+        }
+    }
+
+    init {
+        app.contentResolver.registerContentObserver(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL), true, mediaObserver)
+    }
+
+    override fun onCleared() {
+        getApplication<Application>().contentResolver.unregisterContentObserver(mediaObserver)
+        super.onCleared()
     }
 
     fun reload(then: (() -> Unit)? = null) {
