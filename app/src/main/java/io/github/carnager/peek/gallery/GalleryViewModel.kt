@@ -392,6 +392,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     class ReviewSession(val items: List<MediaImage>, val addedUpTo: Long)
 
     var review by mutableStateOf<ReviewSession?>(null)
+    var settingsOpen by mutableStateOf(false)
     var reviewSettings by mutableStateOf(io.github.carnager.peek.review.Review.settings(app))
         private set
     private var reviewMark by mutableLongStateOf(io.github.carnager.peek.review.Review.mark(app))

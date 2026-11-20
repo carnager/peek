@@ -169,6 +169,9 @@ fun TrunkConnectDialog(vm: GalleryViewModel, onDone: () -> Unit) {
 
 private val LIMITS = listOf(0L to "Original", 4L shl 20 to "Höchstens 4 MB", 2L shl 20 to "Höchstens 2 MB", 1L shl 20 to "Höchstens 1 MB", 500L shl 10 to "Höchstens 500 KB")
 
+/** The current upload limit in words, for the settings. */
+fun uploadLimitLabel(): String = LIMITS.firstOrNull { it.first == TrunkAccount.uploadLimit }?.second ?: "Original"
+
 /** How big photos may be when they go up; bigger ones are sent as smaller JPEGs. */
 @Composable
 fun UploadLimitDialog(onDone: () -> Unit) {

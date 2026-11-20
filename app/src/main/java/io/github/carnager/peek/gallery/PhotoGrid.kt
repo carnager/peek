@@ -228,7 +228,6 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
     val isTrash = source == Source.Trash
     val isTrunk = source.onTrunk
     val trunkAlbum = (source as? Source.TrunkAlbum)?.let { s -> vm.trunkAlbums.firstOrNull { it.id == s.id } }
-    var limitDialog by remember { mutableStateOf(false) }
     LaunchedEffect(source) { if (isTrunk) vm.openTrunk() }
     val userAlbum = (source as? Source.User)?.let { s -> vm.userAlbums.firstOrNull { it.id == s.id } }
     val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkAlbums, source) { vm.imagesOf(source) }
@@ -291,30 +290,18 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                         } else {
                             IconButton(onClick = vm::syncTrunk) { Icon(Icons.Rounded.Refresh, "Aktualisieren") }
                         }
-                        Box {
+                        if (trunkAlbum != null) Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Mehr") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
-                                if (trunkAlbum != null) {
-                                    DropdownMenuItem(
-                                        text = { Text("Umbenennen") },
-                                        leadingIcon = { Icon(Icons.Rounded.Edit, null) },
-                                        onClick = { menu = false; renaming = true },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Album löschen") },
-                                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
-                                        onClick = { menu = false; vm.trunkDeleteAlbum(trunkAlbum.id) },
-                                    )
-                                }
-                                if (trunkAlbum == null) DropdownMenuItem(
-                                    text = { Text("Upload-Größe") },
-                                    leadingIcon = { Icon(Icons.Rounded.Compress, null) },
-                                    onClick = { menu = false; limitDialog = true },
+                                DropdownMenuItem(
+                                    text = { Text("Umbenennen") },
+                                    leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                                    onClick = { menu = false; renaming = true },
                                 )
-                                if (trunkAlbum == null) DropdownMenuItem(
-                                    text = { Text("Abmelden") },
-                                    leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Logout, null) },
-                                    onClick = { menu = false; vm.trunkLogout() },
+                                DropdownMenuItem(
+                                    text = { Text("Album löschen") },
+                                    leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
+                                    onClick = { menu = false; vm.trunkDeleteAlbum(trunkAlbum.id) },
                                 )
                             }
                         }
@@ -486,7 +473,6 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
         }
     }
 
-    if (limitDialog) UploadLimitDialog { limitDialog = false }
     if (renaming && userAlbum != null) {
         NameDialog("Album umbenennen", userAlbum.name, "Speichern", onDismiss = { renaming = false }) {
             vm.renameAlbum(userAlbum.id, it)

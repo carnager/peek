@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -225,6 +227,7 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
             }
         }
 
+        if (vm.settingsOpen) io.github.carnager.peek.settings.SettingsScreen(vm, ops) { vm.settingsOpen = false }
         vm.review?.let { io.github.carnager.peek.review.ReviewScreen(vm, ops, it) }
 
         // Keep messages clear of whichever bar is showing: the viewer's actions, the selection
@@ -281,7 +284,6 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var creating by remember { mutableStateOf(false) }
     var creatingTrunk by remember { mutableStateOf(false) }
-    var reviewSettings by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
     val upload = rememberUploadProgress(vm)
     // The server's albums show here too: load the cached library, then ask what changed.
@@ -306,6 +308,18 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
         topBar = {
             LargeTopAppBar(
                 title = { Text("peek", fontFamily = brandFont(), fontSize = if (scroll.state.collapsedFraction < 0.5f) 40.sp else 24.sp) },
+                actions = {
+                    // The manual way into the nightly review, once it is set up; the badge counts what waits.
+                    if (vm.reviewSettings.configured) {
+                        val pending = vm.reviewPending.size
+                        IconButton(onClick = vm::startReview) {
+                            BadgedBox(badge = { if (pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
+                                Icon(Icons.Rounded.Checklist, "Neue Bilder durchsehen")
+                            }
+                        }
+                    }
+                    IconButton(onClick = { vm.settingsOpen = true }) { Icon(Icons.Rounded.Settings, "Einstellungen") }
+                },
                 scrollBehavior = scroll,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -348,9 +362,6 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
                 }
             }
 
-            item(key = "review", span = { GridItemSpan(maxLineSpan) }) {
-                io.github.carnager.peek.review.ReviewCard(vm) { reviewSettings = true }
-            }
             item(key = "trunk", span = { GridItemSpan(maxLineSpan) }) {
                 TrunkCard(vm, upload) { if (vm.trunkConnected) vm.open = Source.Trunk else connecting = true }
             }
@@ -425,9 +436,6 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
             creating = false
             vm.open = Source.User(vm.createAlbum(name).id)
         }
-    }
-    if (reviewSettings) {
-        io.github.carnager.peek.review.ReviewSettingsSheet(vm, ops) { reviewSettings = false }
     }
     if (creatingTrunk) {
         NameDialog(title = "Neues Album auf trunk", initial = "", confirm = "Anlegen", onDismiss = { creatingTrunk = false }) { name ->
