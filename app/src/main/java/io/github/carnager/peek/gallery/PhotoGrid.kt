@@ -242,7 +242,7 @@ fun PhotoGridScreen(
     val ctx = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
-    val isTrash = source == Source.Trash
+    val isTrash = source == Source.Trash || source == Source.TrunkTrash
     val isTrunk = source.onTrunk
     val trunkAlbum = (source as? Source.TrunkAlbum)?.let { s -> vm.trunkAlbums.firstOrNull { it.id == s.id } }
     LaunchedEffect(source) { if (isTrunk) vm.openTrunk() }
@@ -251,7 +251,7 @@ fun PhotoGridScreen(
     val library = source == Source.Trunk
     var searchOpen by remember { mutableStateOf(library && vm.trunkSearching) }
     var sortMenu by remember { mutableStateOf(false) }
-    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
+    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkTrash, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
     val dayHeaders = !isTrash && (!library || vm.trunkSort.byDate)
     val today = stringResource(R.string.gallery_today)
     val yesterday = stringResource(R.string.gallery_yesterday)
@@ -348,6 +348,9 @@ fun PhotoGridScreen(
                                     }
                                 }
                             }
+                        }
+                        if (isTrash && list.isNotEmpty()) {
+                            TextButton(onClick = { confirmEmpty = true }) { Text(stringResource(R.string.gallery_empty_trash)) }
                         }
                         if (searchOpen) {
                             // Room for the search field; refresh comes back when the search closes.
@@ -488,8 +491,11 @@ fun PhotoGridScreen(
                 }
                 if (isTrash && list.isNotEmpty()) {
                     item(key = "trashInfo", span = { GridItemSpan(maxLineSpan) }) {
+                        // trunk's server decides how long its trash keeps things; the photos say.
+                        val trunkDays = if (!isTrunk) 0 else list.firstNotNullOfOrNull { it.remote }
+                            ?.let { r -> ((r.trashExpiresAt - r.trashedAt) / DateUtils.DAY_IN_MILLIS).toInt() }?.takeIf { it > 0 } ?: 30
                         Text(
-                            stringResource(R.string.gallery_trash_info),
+                            if (isTrunk) pluralStringResource(R.plurals.gallery_trunk_trash_info, trunkDays, trunkDays) else stringResource(R.string.gallery_trash_info),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
@@ -550,7 +556,10 @@ fun PhotoGridScreen(
                         Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (isTrunk) {
+                        if (isTrunk && isTrash) {
+                            PillAction(Icons.Rounded.RestoreFromTrash, stringResource(R.string.gallery_restore)) { vm.trunkRestore(selected) }
+                            PillAction(Icons.Rounded.DeleteForever, stringResource(R.string.gallery_delete)) { vm.trunkDeleteForever(selected) }
+                        } else if (isTrunk) {
                             PillAction(Icons.Rounded.Share, stringResource(R.string.gallery_share)) {
                                 val mime = when {
                                     selected.all { it.isVideo } -> "video/*"
@@ -648,7 +657,7 @@ fun PhotoGridScreen(
             text = { Text(pluralStringResource(R.plurals.gallery_empty_trash_text, list.size, list.size)) },
             confirmButton = {
                 Button(
-                    onClick = { confirmEmpty = false; ops.deleteForever(list) },
+                    onClick = { confirmEmpty = false; if (isTrunk) vm.trunkDeleteForever(list) else ops.deleteForever(list) },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text(stringResource(R.string.gallery_delete_forever)) }
             },
@@ -690,6 +699,8 @@ private fun EmptyState(source: Source, modifier: Modifier) {
     val (icon, title, text) = when (source) {
         Source.Favorites -> Triple(Icons.Rounded.FavoriteBorder, stringResource(R.string.gallery_empty_favorites_title), stringResource(R.string.gallery_empty_favorites_text))
         Source.Trash -> Triple(Icons.Rounded.DeleteOutline, stringResource(R.string.gallery_empty_trash_state_title), stringResource(R.string.gallery_empty_trash_state_text))
+        Source.TrunkTrash -> Triple(Icons.Rounded.DeleteOutline, stringResource(R.string.gallery_empty_trash_state_title), stringResource(R.string.gallery_empty_trunk_trash_text))
+        Source.TrunkFavorites -> Triple(Icons.Rounded.FavoriteBorder, stringResource(R.string.gallery_empty_favorites_title), stringResource(R.string.gallery_empty_favorites_text))
         is Source.User -> Triple(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_empty_album_title), stringResource(R.string.gallery_empty_album_text))
         is Source.TrunkAlbum -> Triple(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_empty_album_title), stringResource(R.string.gallery_empty_trunk_album_text))
         is Source.Memories -> Triple(Icons.Rounded.History, stringResource(R.string.gallery_empty_memories_title), stringResource(R.string.gallery_empty_memories_text))

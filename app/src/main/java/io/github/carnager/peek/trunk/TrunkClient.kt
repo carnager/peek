@@ -112,6 +112,9 @@ data class RemoteAsset(
     val durationMs: Long,
     val favorite: Boolean,
     val trashed: Boolean,
+    /** In trunk's trash: since when, and when it is deleted for good (ms), else 0. */
+    val trashedAt: Long = 0,
+    val trashExpiresAt: Long = 0,
     /** Hash of the current file. */
     val sha256: String,
     /** Edited on trunk; the first upload is kept and can be restored. */
@@ -173,6 +176,8 @@ data class RemoteAsset(
                 durationMs = o.optLong("duration_ms"),
                 favorite = o.optBoolean("favorite"),
                 trashed = s("trashed_at") != null,
+                trashedAt = s("trashed_at")?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0,
+                trashExpiresAt = s("trash_expires_at")?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0,
                 sha256 = s("sha256") ?: "",
                 edited = s("edited_at") != null,
                 updatedAt = s("updated_at"),

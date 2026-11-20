@@ -194,4 +194,18 @@
         <item quantity="one">%1$d Bild in trunks Papierkorb</item>
         <item quantity="other">%1$d Bilder in trunks Papierkorb</item>
     </plurals>
+    <string name="gallery_trunk_trash">Papierkorb auf trunk</string>
+    <string name="gallery_empty_trunk_trash_text">Auf trunk gelöschte Bilder landen hier und lassen sich wiederherstellen, bis der Server seinen Papierkorb leert.</string>
+    <plurals name="gallery_trunk_trash_info">
+        <item quantity="one">trunk löscht Bilder im Papierkorb nach %1$d Tag endgültig.</item>
+        <item quantity="other">trunk löscht Bilder im Papierkorb nach %1$d Tagen endgültig.</item>
+    </plurals>
+    <plurals name="gallery_trunk_restored">
+        <item quantity="one">%1$d Bild wiederhergestellt</item>
+        <item quantity="other">%1$d Bilder wiederhergestellt</item>
+    </plurals>
+    <plurals name="gallery_trunk_deleted">
+        <item quantity="one">%1$d Bild endgültig gelöscht</item>
+        <item quantity="other">%1$d Bilder endgültig gelöscht</item>
+    </plurals>
 </resources>

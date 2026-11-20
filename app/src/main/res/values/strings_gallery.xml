@@ -196,4 +196,18 @@
         <item quantity="one">Moved %1$d photo to trunk\'s trash</item>
         <item quantity="other">Moved %1$d photos to trunk\'s trash</item>
     </plurals>
+    <string name="gallery_trunk_trash">trunk\'s trash</string>
+    <string name="gallery_empty_trunk_trash_text">Photos deleted on trunk end up here and can be restored until the server empties its trash.</string>
+    <plurals name="gallery_trunk_trash_info">
+        <item quantity="one">trunk deletes photos in its trash permanently after %1$d day.</item>
+        <item quantity="other">trunk deletes photos in its trash permanently after %1$d days.</item>
+    </plurals>
+    <plurals name="gallery_trunk_restored">
+        <item quantity="one">Restored %1$d photo</item>
+        <item quantity="other">Restored %1$d photos</item>
+    </plurals>
+    <plurals name="gallery_trunk_deleted">
+        <item quantity="one">Deleted %1$d photo permanently</item>
+        <item quantity="other">Deleted %1$d photos permanently</item>
+    </plurals>
 </resources>

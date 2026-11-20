@@ -119,7 +119,8 @@ object TrunkLibrary {
         return changed
     }
 
-    private fun snapshot() = byId.values.filter { !it.trashed }.sortedWith(compareByDescending<RemoteAsset> { it.takenAt }.thenByDescending { it.id })
+    /** Everything, trashed photos included: peek shows those in trunk's trash. */
+    private fun snapshot() = byId.values.sortedWith(compareByDescending<RemoteAsset> { it.takenAt }.thenByDescending { it.id })
 
     /** Fetches what changed since last time and returns the updated library. */
     suspend fun sync(ctx: Context): List<RemoteAsset> = withContext(Dispatchers.IO) {

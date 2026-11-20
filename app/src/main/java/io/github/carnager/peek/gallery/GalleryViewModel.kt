@@ -32,6 +32,9 @@ sealed interface Source {
     data object Trunk : Source
     /** An album on the trunk server. */
     data class TrunkAlbum(val id: Long) : Source
+    /** trunk's favourites and trash. */
+    data object TrunkFavorites : Source
+    data object TrunkTrash : Source
     /** Photos from this day in earlier years; [remote] when they come from trunk. */
     data class Memories(val remote: Boolean) : Source
 }
@@ -101,7 +104,9 @@ enum class TrunkFilter(@StringRes val label: Int) { Photos(R.string.gallery_filt
 enum class Tab(@StringRes val label: Int) { Phone(R.string.gallery_tab_phone), Trunk(R.string.gallery_tab_trunk), Folders(R.string.gallery_tab_folders) }
 
 /** Shows photos from the trunk server, so actions go there. */
-val Source?.onTrunk: Boolean get() = this == Source.Trunk || this is Source.TrunkAlbum || (this is Source.Memories && remote)
+val Source?.onTrunk: Boolean
+    get() = this == Source.Trunk || this == Source.TrunkFavorites || this == Source.TrunkTrash || this is Source.TrunkAlbum ||
+        (this is Source.Memories && remote)
 
 /** A short message with an optional action, shown as a snackbar. */
 data class Message(val text: String, val action: String? = null, val token: Long = System.nanoTime(), val onAction: (() -> Unit)? = null)
@@ -171,8 +176,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- trunk ---
 
-    var trunk by mutableStateOf<List<MediaImage>>(emptyList())
-        private set
+    /** The whole library as cached, trashed photos included; [trunk] and [trunkTrash] split it. */
+    private var trunkAll by mutableStateOf<List<MediaImage>>(emptyList())
+    val trunk: List<MediaImage> by androidx.compose.runtime.derivedStateOf { trunkAll.filter { it.remote?.trashed != true } }
+    val trunkFavorites: List<MediaImage> by androidx.compose.runtime.derivedStateOf { trunk.filter { it.isFavorite } }
+    /** Most recently deleted first. */
+    val trunkTrash: List<MediaImage> by androidx.compose.runtime.derivedStateOf {
+        trunkAll.filter { it.remote?.trashed == true }.sortedByDescending { it.remote?.trashedAt ?: 0 }
+    }
     var trunkSyncing by mutableStateOf(false)
         private set
     var trunkConnected by mutableStateOf(TrunkAccount.connected)
@@ -265,25 +276,33 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         isFavorite = favorite,
         isVideo = isVideo,
         duration = durationMs,
+        expires = trashExpiresAt,
         remote = this,
     )
 
     /** Shows the cached library at once, then asks the server what changed. */
     fun openTrunk() {
         viewModelScope.launch {
-            trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+            trunkAll = TrunkLibrary.cached(getApplication()).map { it.toImage() }
             trunkAlbums = TrunkLibrary.cachedAlbums(getApplication())
             loadShared()
             syncTrunk()
         }
     }
 
+    /** Set when a sync is asked for while one runs: that one may have started before the change. */
+    private var syncAgain = false
+
     fun syncTrunk() {
-        if (!TrunkAccount.connected || trunkSyncing) return
+        if (!TrunkAccount.connected) return
+        if (trunkSyncing) {
+            syncAgain = true
+            return
+        }
         viewModelScope.launch {
             trunkSyncing = true
             try {
-                trunk = TrunkLibrary.sync(getApplication()).map { it.toImage() }
+                trunkAll = TrunkLibrary.sync(getApplication()).map { it.toImage() }
                 trunkAlbums = TrunkLibrary.cachedAlbums(getApplication())
                 loadShared()
                 if (open is Source.TrunkAlbum && trunkAlbums.none { it.id == (open as Source.TrunkAlbum).id }) {
@@ -303,6 +322,10 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 message = Message(str(R.string.gallery_trunk_unreachable_detail, e.message ?: e.javaClass.simpleName))
             } finally {
                 trunkSyncing = false
+                if (syncAgain) {
+                    syncAgain = false
+                    syncTrunk()
+                }
             }
         }
     }
@@ -332,7 +355,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             TrunkLibrary.clear(getApplication())
             io.github.carnager.peek.trunk.TrunkFiles.clear(getApplication())
             trunkConnected = false
-            trunk = emptyList()
+            trunkAll = emptyList()
             trunkAlbums = emptyList()
             if (open.onTrunk) open = null
         }
@@ -363,7 +386,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun trunkFavorite(images: List<MediaImage>, favorite: Boolean) = trunkCall {
         ownOnly(images).mapNotNull { it.remote }.forEach { TrunkLibrary.put(getApplication(), TrunkClient.setFavorite(it.id, favorite)) }
-        trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+        trunkAll = TrunkLibrary.cached(getApplication()).map { it.toImage() }
     }
 
     // Albums on trunk. Images carry negative ids (see toImage); the server wants its own.
@@ -483,14 +506,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     fun trunkCaption(image: MediaImage, caption: String) = trunkCall {
         val id = image.remote?.id ?: return@trunkCall
         TrunkLibrary.put(getApplication(), TrunkClient.setCaption(id, caption))
-        trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+        trunkAll = TrunkLibrary.cached(getApplication()).map { it.toImage() }
     }
 
     /** Back to the photo as first uploaded. */
     fun trunkRevertEdit(image: MediaImage) = trunkCall {
         val id = image.remote?.id ?: return@trunkCall
         TrunkLibrary.put(getApplication(), TrunkClient.revertEdit(id))
-        trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+        trunkAll = TrunkLibrary.cached(getApplication()).map { it.toImage() }
         message = Message(str(R.string.gallery_edit_reverted))
     }
 
@@ -505,6 +528,26 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Takes photos out of trunk's trash again. */
+    fun trunkRestore(images: List<MediaImage>) = trunkCall {
+        val ids = images.mapNotNull { it.remote?.id }
+        if (ids.isEmpty()) return@trunkCall
+        TrunkClient.restore(ids)
+        selection = emptySet()
+        syncTrunk()
+        message = Message(plural(R.plurals.gallery_trunk_restored, ids.size, ids.size))
+    }
+
+    /** Deletes photos in trunk's trash for good, on the server. */
+    fun trunkDeleteForever(images: List<MediaImage>) = trunkCall {
+        val ids = images.mapNotNull { it.remote?.id }
+        if (ids.isEmpty()) return@trunkCall
+        TrunkClient.deleteForever(ids)
+        selection = emptySet()
+        syncTrunk()
+        message = Message(plural(R.plurals.gallery_trunk_deleted, ids.size, ids.size))
+    }
+
     fun imagesOf(source: Source?): List<MediaImage> = when (source) {
         null -> emptyList()
         Source.All -> images
@@ -516,6 +559,8 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             images.filter { it.id in ids }
         }
         Source.Trunk -> trunkView
+        Source.TrunkFavorites -> trunkFavorites
+        Source.TrunkTrash -> trunkTrash
         is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.images ?: emptyList()
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.let(::trunkAlbumImages) ?: emptyList()
     }
@@ -538,6 +583,8 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         is Source.Folder -> folders.firstOrNull { it.bucketId == source.bucketId }?.name ?: ""
         is Source.User -> userAlbums.firstOrNull { it.id == source.id }?.name ?: ""
         Source.Trunk -> "trunk"
+        Source.TrunkFavorites -> str(R.string.gallery_favorites)
+        Source.TrunkTrash -> str(R.string.gallery_trunk_trash)
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.title(getApplication()) ?: ""
         is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.title(getApplication<Application>().resources) ?: str(R.string.gallery_memories)
     }

@@ -494,8 +494,18 @@ private fun TrunkHeader(vm: GalleryViewModel) {
                 }
             }
         }
-        vm.trunkMemories?.let { m ->
-            Strip { item(key = "memories") { MemoriesTile(m) { vm.open = Source.Memories(true) } } }
+        Strip {
+            vm.trunkMemories?.let { m -> item(key = "memories") { MemoriesTile(m) { vm.open = Source.Memories(true) } } }
+            item(key = "fav") {
+                StripCard(stringResource(R.string.gallery_favorites), countLabel(vm.trunkFavorites.size), vm.trunkFavorites.firstOrNull(), Icons.Rounded.Favorite, Color(0xFFFF4D6D)) {
+                    vm.open = Source.TrunkFavorites
+                }
+            }
+            item(key = "trash") {
+                StripCard(stringResource(R.string.gallery_trash), countLabel(vm.trunkTrash.size), null, Icons.Rounded.DeleteOutline, MaterialTheme.colorScheme.onSurfaceVariant) {
+                    vm.open = Source.TrunkTrash
+                }
+            }
         }
         val albums = vm.trunkAlbums.filter { !it.direct }
         StripTitle(stringResource(R.string.gallery_albums)) { NewButton { creating = true } }
