@@ -277,7 +277,8 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
 
         // Keep messages clear of whichever bar is showing: the viewer's actions, the selection
         // pill or the review's buttons (all about 60dp tall, near the navigation bar).
-        val barShown = vm.viewerIndex != null || vm.selection.isNotEmpty() || vm.review != null
+        // The tab bar (80dp) is there whenever a tab's own screen is.
+        val barShown = vm.viewerIndex != null || vm.selection.isNotEmpty() || vm.review != null || vm.open == null
         val snackbarLift by androidx.compose.animation.core.animateDpAsState(if (barShown) 96.dp else 16.dp, label = "snackbarLift")
         SnackbarHost(
             snackbar,
