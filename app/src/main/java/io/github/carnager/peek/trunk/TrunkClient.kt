@@ -61,6 +61,8 @@ object TrunkAccount {
     fun thumbUrl(a: RemoteAsset, size: String) = api("/assets/${a.id}/thumb/$size?v=${a.version}")
     /** The current file: the edit, if there is one. */
     fun fileUrl(a: RemoteAsset) = api("/assets/${a.id}/file?v=${a.version}")
+    /** A face cut from its photo, 200×200. */
+    fun faceUrl(face: Long) = api("/faces/$face/thumb")
     /** A motion photo's video. */
     fun motionUrl(a: RemoteAsset) = api("/assets/${a.id}/motion?v=${a.version}")
 
@@ -408,6 +410,39 @@ object TrunkClient {
     /** Groups of look-alike photos (trunk 1f9c1f1 and later; older servers answer 404). */
     suspend fun similar(): JSONObject = withContext(Dispatchers.IO) {
         call(Request.Builder().url(TrunkAccount.api("/similar")).build())
+    }
+
+    /** One of your people, grouped from faces by trunk (trunk-ai finds them). */
+    data class Person(val id: Long, val name: String, val hidden: Boolean, val cover: Long, val assetIds: List<Long>)
+
+    suspend fun people(): List<Person> = withContext(Dispatchers.IO) {
+        val arr = call(Request.Builder().url(TrunkAccount.api("/people")).build()).optJSONArray("people") ?: JSONArray()
+        List(arr.length()) { i ->
+            val o = arr.getJSONObject(i)
+            val ids = o.optJSONArray("asset_ids") ?: JSONArray()
+            Person(o.getLong("id"), o.optString("name"), o.optBoolean("hidden"), o.optLong("cover"), List(ids.length()) { ids.getLong(it) })
+        }
+    }
+
+    suspend fun patchPerson(id: Long, name: String? = null, hidden: Boolean? = null) = withContext(Dispatchers.IO) {
+        val body = JSONObject()
+        name?.let { body.put("name", it) }
+        hidden?.let { body.put("hidden", it) }
+        call(Request.Builder().url(TrunkAccount.api("/people/$id")).patch(body.toString().toRequestBody(json)).build())
+    }
+
+    /** [others] are the same person as [id]. */
+    suspend fun mergePeople(id: Long, others: Collection<Long>) = idsCall("/people/$id/merge", others)
+
+    /** The faces in a photo: face id → person id (0 for none). */
+    suspend fun assetFaces(assetId: Long): Map<Long, Long> = withContext(Dispatchers.IO) {
+        val arr = call(Request.Builder().url(TrunkAccount.api("/assets/$assetId/faces")).build()).optJSONArray("faces") ?: JSONArray()
+        (0 until arr.length()).associate { i -> arr.getJSONObject(i).let { it.getLong("id") to it.optLong("person") } }
+    }
+
+    /** Not this person: the face leaves them for good. */
+    suspend fun rejectFace(person: Long, face: Long) = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/people/$person/faces/$face")).delete().build())
     }
 
     /** A town found by name: [label] is "Wien, Österreich" in the phone's language. */

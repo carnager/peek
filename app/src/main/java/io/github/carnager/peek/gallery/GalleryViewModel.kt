@@ -37,6 +37,8 @@ sealed interface Source {
     data class TrunkAlbum(val id: Long) : Source
     /** trunk's favourites and trash. */
     data object TrunkFavorites : Source
+    /** A person, from the faces trunk grouped. */
+    data class TrunkPerson(val id: Long) : Source
     data object TrunkTrash : Source
     /** Photos from this day in earlier years; [remote] when they come from trunk. */
     data class Memories(val remote: Boolean) : Source
@@ -108,7 +110,7 @@ enum class Tab(@StringRes val label: Int) { Phone(R.string.gallery_tab_phone), T
 
 /** Shows photos from the trunk server, so actions go there. */
 val Source?.onTrunk: Boolean
-    get() = this == Source.Trunk || this == Source.TrunkFavorites || this == Source.TrunkTrash || this is Source.TrunkAlbum ||
+    get() = this == Source.Trunk || this == Source.TrunkFavorites || this == Source.TrunkTrash || this is Source.TrunkAlbum || this is Source.TrunkPerson ||
         (this is Source.Memories && remote)
 
 /** A short message with an optional action, shown as a snackbar. */
@@ -253,12 +255,16 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val albumsOf = if (words.isEmpty()) emptyMap() else HashMap<Long, StringBuilder>().also { m ->
             trunkAlbums.forEach { a -> a.assetIds.forEach { id -> m.getOrPut(id) { StringBuilder() }.append(' ').append(a.name.lowercase()) } }
         }
+        // People's names find their photos: "anna".
+        val namesOf = if (words.isEmpty()) emptyMap() else HashMap<Long, StringBuilder>().also { m ->
+            trunkPeople.filter { it.name.isNotEmpty() }.forEach { p -> p.assetIds.forEach { id -> m.getOrPut(id) { StringBuilder() }.append(' ').append(p.name.lowercase()) } }
+        }
         val f = trunkFilters
         val list = trunk.filter { img ->
             val r = img.remote!!
             (TrunkFilter.Photos !in f || !r.isVideo) && (TrunkFilter.Videos !in f || r.isVideo) &&
                 (TrunkFilter.Favorites !in f || r.favorite) &&
-                (words.all { w -> w in r.searchText || albumsOf[r.id]?.contains(w) == true } || r.id in contentHits)
+                (words.all { w -> w in r.searchText || albumsOf[r.id]?.contains(w) == true || namesOf[r.id]?.contains(w) == true } || r.id in contentHits)
         }
         return when (trunkSort) {
             TrunkSort.Newest -> list // the library comes newest first
@@ -293,6 +299,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     /** Shows the cached library at once, then asks the server what changed. */
     fun openTrunk() {
         refreshContent()
+        loadPeople()
         viewModelScope.launch {
             trunkAll = TrunkLibrary.cached(getApplication()).map { it.toImage() }
             trunkAlbums = TrunkLibrary.cachedAlbums(getApplication())
@@ -612,6 +619,55 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         similar = similar?.filter { it !== g }
     }
 
+    // --- people ---
+
+    /** Your people, most photographed first (hidden ones too; the app leaves them out). */
+    var trunkPeople by mutableStateOf<List<io.github.carnager.peek.trunk.TrunkClient.Person>>(emptyList())
+        private set
+
+    fun loadPeople() {
+        viewModelScope.launch {
+            trunkPeople = runCatching { io.github.carnager.peek.trunk.TrunkClient.people() }.getOrDefault(trunkPeople)
+        }
+    }
+
+    fun renamePerson(id: Long, name: String) = trunkCall {
+        io.github.carnager.peek.trunk.TrunkClient.patchPerson(id, name = name)
+        trunkPeople = io.github.carnager.peek.trunk.TrunkClient.people()
+    }
+
+    fun hidePerson(id: Long, hidden: Boolean) = trunkCall {
+        io.github.carnager.peek.trunk.TrunkClient.patchPerson(id, hidden = hidden)
+        trunkPeople = io.github.carnager.peek.trunk.TrunkClient.people()
+        if (hidden && open == Source.TrunkPerson(id)) open = null
+        message = Message(str(if (hidden) R.string.gallery_person_hidden else R.string.gallery_person_shown))
+    }
+
+    /** [others] are the same person as [id]. */
+    fun mergePeople(id: Long, others: Collection<Long>) = trunkCall {
+        io.github.carnager.peek.trunk.TrunkClient.mergePeople(id, others)
+        trunkPeople = io.github.carnager.peek.trunk.TrunkClient.people()
+        message = Message(str(R.string.gallery_people_merged))
+    }
+
+    /** These photos do not show the person: their faces leave them. */
+    fun notThisPerson(person: Long, images: List<MediaImage>) = trunkCall {
+        var n = 0
+        for (img in images) {
+            val id = img.remote?.id ?: continue
+            for ((face, p) in io.github.carnager.peek.trunk.TrunkClient.assetFaces(id)) {
+                if (p == person) {
+                    io.github.carnager.peek.trunk.TrunkClient.rejectFace(person, face)
+                    n++
+                }
+            }
+        }
+        selection = emptySet()
+        trunkPeople = io.github.carnager.peek.trunk.TrunkClient.people()
+        if (trunkPeople.none { it.id == person } && open == Source.TrunkPerson(person)) open = null
+        message = Message(plural(R.plurals.gallery_person_removed, images.size, images.size))
+    }
+
     // --- content search ---
 
     /** Where content search stands on this phone. */
@@ -743,6 +799,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         Source.Trunk -> trunkView
         Source.TrunkFavorites -> trunkFavorites
         Source.TrunkTrash -> trunkTrash
+        is Source.TrunkPerson -> trunkPeople.firstOrNull { it.id == source.id }?.assetIds?.mapNotNull { trunkById[it] } ?: emptyList()
         is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.images ?: emptyList()
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.let(::trunkAlbumImages) ?: emptyList()
     }
@@ -767,6 +824,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         Source.Trunk -> "trunk"
         Source.TrunkFavorites -> str(R.string.gallery_favorites)
         Source.TrunkTrash -> str(R.string.gallery_trunk_trash)
+        is Source.TrunkPerson -> trunkPeople.firstOrNull { it.id == source.id }?.name?.ifEmpty { null } ?: str(R.string.gallery_person_unnamed)
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.title(getApplication()) ?: ""
         is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.title(getApplication<Application>().resources) ?: str(R.string.gallery_memories)
     }

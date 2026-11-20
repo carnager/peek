@@ -524,6 +524,20 @@ private fun TrunkHeader(vm: GalleryViewModel) {
                 }
             }
         }
+        // People, from the faces trunk-ai found.
+        if (vm.trunkPeople.any { !it.hidden }) {
+            var allPeople by remember { mutableStateOf(false) }
+            StripTitle(stringResource(R.string.gallery_people)) {
+                TextButton(onClick = { allPeople = true }) { Text(stringResource(R.string.gallery_people_all)) }
+            }
+            androidx.compose.foundation.lazy.LazyRow(
+                contentPadding = PaddingValues(horizontal = 13.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) { peopleRow(vm) }
+            if (allPeople) {
+                PeopleSheet(vm, stringResource(R.string.gallery_people), onPick = { id -> allPeople = false; vm.open = Source.TrunkPerson(id) }) { allPeople = false }
+            }
+        }
         val albums = vm.trunkAlbums.filter { !it.direct }
         StripTitle(stringResource(R.string.gallery_albums)) { NewButton { creating = true } }
         if (albums.isEmpty()) {

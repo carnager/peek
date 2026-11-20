@@ -1,5 +1,6 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.material.icons.rounded.PersonOff
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.EditCalendar
 import io.github.carnager.peek.ui.brandFont
@@ -255,7 +256,7 @@ fun PhotoGridScreen(
     val library = source == Source.Trunk
     var searchOpen by remember { mutableStateOf(library && vm.trunkSearching) }
     var sortMenu by remember { mutableStateOf(false) }
-    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkTrash, vm.contentHits, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
+    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkTrash, vm.contentHits, vm.trunkPeople, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
     val dayHeaders = !isTrash && (!library || vm.trunkSort.byDate)
     val today = stringResource(R.string.gallery_today)
     val yesterday = stringResource(R.string.gallery_yesterday)
@@ -269,6 +270,9 @@ fun PhotoGridScreen(
     var sending by remember { mutableStateOf<List<MediaImage>?>(null) }
     var linking by remember { mutableStateOf<Pair<Long?, List<MediaImage>>?>(null) }
     var adjusting by remember { mutableStateOf<List<MediaImage>?>(null) }
+    val person = (source as? Source.TrunkPerson)?.let { s -> vm.trunkPeople.firstOrNull { it.id == s.id } }
+    var naming by remember { mutableStateOf(false) }
+    var merging by remember { mutableStateOf(false) }
     var askContentDownload by remember { mutableStateOf(false) }
     var confirmEnd by remember { mutableStateOf(false) }
     var confirmEmpty by remember { mutableStateOf(false) }
@@ -364,6 +368,27 @@ fun PhotoGridScreen(
                             CircularProgressIndicator(Modifier.padding(12.dp).size(22.dp), strokeWidth = 2.5.dp)
                         } else {
                             IconButton(onClick = vm::syncTrunk) { Icon(Icons.Rounded.Refresh, stringResource(R.string.gallery_refresh)) }
+                        }
+                        if (person != null) Box {
+                            var personMenu by remember { mutableStateOf(false) }
+                            IconButton(onClick = { personMenu = true }) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.gallery_more)) }
+                            DropdownMenu(expanded = personMenu, onDismissRequest = { personMenu = false }, shape = RoundedCornerShape(20.dp)) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_person_name)) },
+                                    leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                                    onClick = { personMenu = false; naming = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_person_merge)) },
+                                    leadingIcon = { Icon(Icons.Rounded.Group, null) },
+                                    onClick = { personMenu = false; merging = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(if (person.hidden) R.string.gallery_person_show else R.string.gallery_person_hide)) },
+                                    leadingIcon = { Icon(Icons.Rounded.VisibilityOff, null) },
+                                    onClick = { personMenu = false; vm.hidePerson(person.id, !person.hidden) },
+                                )
+                            }
                         }
                         if (trunkAlbum != null) Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.gallery_more)) }
@@ -599,6 +624,9 @@ fun PhotoGridScreen(
                             }
                             PillAction(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_album)) { vm.addToAlbum = selected.map { it.id } }
                             PillAction(Icons.Rounded.EditCalendar, stringResource(R.string.gallery_adjust_short)) { adjusting = selected }
+                            if (person != null) {
+                                PillAction(Icons.Rounded.PersonOff, stringResource(R.string.gallery_person_not)) { vm.notThisPerson(person.id, selected) }
+                            }
                             PillAction(Icons.AutoMirrored.Rounded.Send, stringResource(R.string.gallery_send)) { sending = selected }
                             PillAction(Icons.Rounded.Link, stringResource(R.string.gallery_link)) { linking = null to selected }
                             if (trunkAlbum != null) {
@@ -654,6 +682,18 @@ fun PhotoGridScreen(
     if (sharing && trunkAlbum != null) ShareAlbumSheet(vm, trunkAlbum) { sharing = false }
     sending?.let { imgs -> SendSheet(vm, imgs) { sending = null } }
     adjusting?.let { imgs -> AdjustSheet(vm, imgs) { adjusting = null } }
+    if (naming && person != null) {
+        NameDialog(stringResource(R.string.gallery_person_name), person.name, stringResource(R.string.gallery_adjust_save), onDismiss = { naming = false }) {
+            vm.renamePerson(person.id, it)
+            naming = false
+        }
+    }
+    if (merging && person != null) {
+        PeopleSheet(vm, stringResource(R.string.gallery_person_merge_title), exclude = person.id, onPick = { other ->
+            merging = false
+            vm.mergePeople(person.id, listOf(other))
+        }) { merging = false }
+    }
     if (askContentDownload) {
         val offer = (vm.content as? GalleryViewModel.Content.Available)?.offer
         AlertDialog(

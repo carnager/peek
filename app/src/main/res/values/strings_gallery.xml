@@ -275,4 +275,21 @@
     <string name="gallery_content_title">Search by what is in the photos?</string>
     <string name="gallery_content_text">peek downloads a language model from your trunk (%1$d MB, once) and uses it on this phone to understand searches like “Hund am Strand” or “snow in the forest”. Your searches go to your trunk only. %2$d photos are searchable so far; trunk-ai adds new ones.</string>
     <string name="gallery_content_download">Download</string>
+    <string name="gallery_people">People</string>
+    <string name="gallery_people_all">All</string>
+    <string name="gallery_person_unnamed">Without a name</string>
+    <string name="gallery_person_name_it">Name?</string>
+    <string name="gallery_person_name">Name</string>
+    <string name="gallery_person_merge">Same person as…</string>
+    <string name="gallery_person_merge_title">Which person is this too?</string>
+    <string name="gallery_person_hide">Hide</string>
+    <string name="gallery_person_show">Show again</string>
+    <string name="gallery_person_hidden">Hidden; “All” still shows them</string>
+    <string name="gallery_person_shown">Shown again</string>
+    <string name="gallery_person_not">Not them</string>
+    <string name="gallery_people_merged">Merged</string>
+    <plurals name="gallery_person_removed">
+        <item quantity="one">%1$d photo taken out</item>
+        <item quantity="other">%1$d photos taken out</item>
+    </plurals>
 </resources>

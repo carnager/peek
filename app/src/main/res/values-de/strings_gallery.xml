@@ -273,4 +273,21 @@
     <string name="gallery_content_title">Nach dem suchen, was auf den Bildern ist?</string>
     <string name="gallery_content_text">peek lädt ein Sprachmodell von deinem trunk (%1$d MB, einmalig) und versteht damit auf diesem Handy Suchen wie „Hund am Strand“ oder „Schnee im Wald“. Deine Suchen gehen nur an deinen trunk. Bisher sind %2$d Bilder durchsuchbar; trunk-ai ergänzt neue.</string>
     <string name="gallery_content_download">Laden</string>
+    <string name="gallery_people">Personen</string>
+    <string name="gallery_people_all">Alle</string>
+    <string name="gallery_person_unnamed">Ohne Namen</string>
+    <string name="gallery_person_name_it">Name?</string>
+    <string name="gallery_person_name">Name</string>
+    <string name="gallery_person_merge">Dieselbe Person wie …</string>
+    <string name="gallery_person_merge_title">Wer ist das auch?</string>
+    <string name="gallery_person_hide">Ausblenden</string>
+    <string name="gallery_person_show">Wieder zeigen</string>
+    <string name="gallery_person_hidden">Ausgeblendet; unter „Alle“ weiter zu finden</string>
+    <string name="gallery_person_shown">Wird wieder gezeigt</string>
+    <string name="gallery_person_not">Nicht diese</string>
+    <string name="gallery_people_merged">Zusammengeführt</string>
+    <plurals name="gallery_person_removed">
+        <item quantity="one">%1$d Bild herausgenommen</item>
+        <item quantity="other">%1$d Bilder herausgenommen</item>
+    </plurals>
 </resources>
