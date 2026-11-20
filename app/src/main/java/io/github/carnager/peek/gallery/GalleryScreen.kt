@@ -1,5 +1,6 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.fillMaxSize
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -132,18 +133,34 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
     }
 
     Box(Modifier.fillMaxSize()) {
+        // The trunk tab's albums and memories: load the cached library, then ask what changed.
+        LaunchedEffect(vm.trunkConnected) { if (vm.trunkConnected) vm.openTrunk() }
         AnimatedContent(
-            targetState = vm.open,
+            targetState = vm.open ?: vm.tab,
             transitionSpec = {
-                if (targetState != null) {
+                if (initialState is Tab && targetState is Tab) {
+                    fadeIn() togetherWith fadeOut()
+                } else if (targetState is Source) {
                     (slideInHorizontally { it / 3 } + fadeIn()) togetherWith (slideOutHorizontally { -it / 6 } + fadeOut())
                 } else {
                     (slideInHorizontally { -it / 6 } + fadeIn()) togetherWith (slideOutHorizontally { it / 3 } + fadeOut())
                 }
             },
             label = "albums",
-        ) { source ->
-            if (source == null) AlbumsScreen(vm, ops, tabGrids) else PhotoGridScreen(vm, ops, source)
+        ) { screen ->
+            val tabBar: @Composable () -> Unit = { TabBar(vm, tabGrids) }
+            when {
+                screen is Source -> PhotoGridScreen(vm, ops, screen)
+                screen == Tab.Phone -> PhotoGridScreen(
+                    vm, ops, Source.All, root = true, grid = tabGrids.getValue(Tab.Phone),
+                    header = { PhoneHeader(vm, ops) }, bottomBar = tabBar,
+                )
+                screen == Tab.Trunk && vm.trunkConnected -> PhotoGridScreen(
+                    vm, ops, Source.Trunk, root = true, grid = tabGrids.getValue(Tab.Trunk),
+                    header = { TrunkHeader(vm) }, bottomBar = tabBar,
+                )
+                else -> AlbumsScreen(vm, tabGrids, tabBar)
+            }
         }
 
         // The viewer sits on top of the album so the grid keeps its scroll position underneath.
@@ -188,7 +205,7 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                                 val remote = img?.remote
                                 if (img != null && remote != null) vm.withTrunkOriginals(listOf(img)) { ops.editTrunk(it[0], remote) } else ops.edit(item.uri)
                             },
-                            onShare = if (!vm.open.onTrunk) null else { item ->
+                            onShare = if (!vm.shown.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { img ->
                                     vm.withTrunkOriginals(listOf(img)) { io.github.carnager.peek.viewer.share(ctx, it, img.mimeType) }
                                 }
@@ -201,16 +218,16 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                                     if (it.remote != null) vm.trunkFavorite(listOf(it), !it.isFavorite) else ops.setFavorite(listOf(it), !it.isFavorite)
                                 }
                             },
-                            onCaption = if (!vm.open.onTrunk) null else { item, caption ->
+                            onCaption = if (!vm.shown.onTrunk) null else { item, caption ->
                                 list.firstOrNull { it.uri == item.uri }?.let { vm.trunkCaption(it, caption) }
                             },
-                            onSend = if (!vm.open.onTrunk) null else { item ->
+                            onSend = if (!vm.shown.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { viewerSend = listOf(it) }
                             },
-                            onLink = if (!vm.open.onTrunk) null else { item ->
+                            onLink = if (!vm.shown.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { viewerLink = listOf(it) }
                             },
-                            onRevertEdit = if (!vm.open.onTrunk) null else { item ->
+                            onRevertEdit = if (!vm.shown.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { vm.trunkRevertEdit(it) }
                             },
                             // Phone photos go into peek's albums, server photos into trunk's.
@@ -305,40 +322,59 @@ private fun closeHero(vm: GalleryViewModel, list: List<MediaImage>, w: Float, h:
     vm.hero = Hero(image, from, opening = false, backdrop = backdrop)
 }
 
+/** The tabs below the overview; tapping the open one again scrolls it to the top. */
+@Composable
+private fun TabBar(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>) {
+    val scope = rememberCoroutineScope()
+    NavigationBar {
+        Tab.entries.forEach { t ->
+            NavigationBarItem(
+                selected = vm.tab == t,
+                onClick = { if (vm.tab == t) scope.launch { grids.getValue(t).animateScrollToItem(0) } else vm.selectTab(t) },
+                icon = {
+                    Icon(
+                        when (t) {
+                            Tab.Phone -> Icons.Rounded.Smartphone
+                            Tab.Trunk -> Icons.Rounded.Cloud
+                            Tab.Folders -> Icons.Rounded.Folder
+                        },
+                        null,
+                    )
+                },
+                label = { Text(t.label) },
+            )
+        }
+    }
+}
+
+/** The review and settings buttons, in the bar of every tab. */
+@Composable
+internal fun RootActions(vm: GalleryViewModel) {
+    // The manual way into the nightly review, once it is set up; the badge counts what waits.
+    if (vm.reviewSettings.configured) {
+        val pending = vm.reviewPending.size
+        IconButton(onClick = vm::startReview) {
+            BadgedBox(badge = { if (pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
+                Icon(Icons.Rounded.Checklist, "Neue Bilder durchsehen")
+            }
+        }
+    }
+    IconButton(onClick = { vm.settingsOpen = true }) { Icon(Icons.Rounded.Settings, "Einstellungen") }
+}
+
+/** Tabs that are not a photo grid: the folders, and trunk while it is not connected. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, LazyGridState>) {
+private fun AlbumsScreen(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>, tabBar: @Composable () -> Unit) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val scope = rememberCoroutineScope()
-    // Re-checked when coming back, so returning from the settings page updates it.
-    var canManage by remember { mutableStateOf(ops.canManageMedia) }
-    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
-        canManage = ops.canManageMedia
-        onPauseOrDispose {}
-    }
-    var creating by remember { mutableStateOf(false) }
-    var creatingTrunk by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
-    // The server's albums and memories: load the cached library, then ask what changed.
-    LaunchedEffect(vm.trunkConnected) { if (vm.trunkConnected) vm.openTrunk() }
-
+    val t = vm.tab
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text("peek", fontFamily = brandFont(), fontSize = if (scroll.state.collapsedFraction < 0.5f) 40.sp else 24.sp) },
-                actions = {
-                    // The manual way into the nightly review, once it is set up; the badge counts what waits.
-                    if (vm.reviewSettings.configured) {
-                        val pending = vm.reviewPending.size
-                        IconButton(onClick = vm::startReview) {
-                            BadgedBox(badge = { if (pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
-                                Icon(Icons.Rounded.Checklist, "Neue Bilder durchsehen")
-                            }
-                        }
-                    }
-                    IconButton(onClick = { vm.settingsOpen = true }) { Icon(Icons.Rounded.Settings, "Einstellungen") }
-                },
+                title = { Text(if (t == Tab.Trunk) "trunk" else "peek", fontFamily = brandFont(), fontSize = if (scroll.state.collapsedFraction < 0.5f) 40.sp else 24.sp) },
+                actions = { RootActions(vm) },
                 scrollBehavior = scroll,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -346,161 +382,224 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, La
                 ),
             )
         },
-        bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { t ->
-                    NavigationBarItem(
-                        selected = vm.tab == t,
-                        onClick = {
-                            if (vm.tab == t) {
-                                // Tapping the open tab again goes back to its top.
-                                scope.launch { grids.getValue(t).animateScrollToItem(0) }
-                            } else {
-                                vm.selectTab(t)
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                when (t) {
-                                    Tab.Phone -> Icons.Rounded.Smartphone
-                                    Tab.Trunk -> Icons.Rounded.Cloud
-                                    Tab.Folders -> Icons.Rounded.Folder
-                                },
-                                null,
-                            )
-                        },
-                        label = { Text(t.label) },
-                    )
-                }
-            }
-        },
+        bottomBar = tabBar,
     ) { pad ->
-        val padding = PaddingValues(start = 16.dp, end = 16.dp, top = pad.calculateTopPadding() + 4.dp, bottom = pad.calculateBottomPadding() + 24.dp)
-        AnimatedContent(vm.tab, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { t ->
-            LazyVerticalGrid(
-                state = grids.getValue(t),
-                columns = GridCells.Adaptive(160.dp),
-                contentPadding = padding,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                when (t) {
-                    Tab.Phone -> phoneTab(vm, ops, canManage) { creating = true }
-                    Tab.Trunk -> trunkTab(vm, onConnect = { connecting = true }, onNewAlbum = { creatingTrunk = true })
-                    Tab.Folders -> foldersTab(vm)
+        LazyVerticalGrid(
+            state = grids.getValue(t),
+            columns = GridCells.Adaptive(160.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = pad.calculateTopPadding() + 4.dp, bottom = pad.calculateBottomPadding() + 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            if (t == Tab.Trunk) {
+                item(key = "trunk", span = ::full) { TrunkCard(vm, null) { connecting = true } }
+                item(key = "trunkIntro", span = ::full) {
+                    Hint("trunk ist dein eigener Server für Fotos und Videos: Sicherung, Alben, Teilen, auf allen Geräten. Verbinde peek oben mit deinem trunk.")
+                }
+            } else {
+                if (vm.folders.isEmpty()) {
+                    item(key = "foldersEmpty", span = ::full) { Hint("Noch keine Ordner mit Bildern auf dem Handy.") }
+                }
+                items(vm.folders, key = { "f:" + it.bucketId }) { a ->
+                    AlbumCard(a.name, a.count, a.cover, Modifier.animateItem()) { vm.open = Source.Folder(a.bucketId) }
                 }
             }
         }
     }
+    if (connecting) TrunkConnectDialog(vm, onDone = { connecting = false })
+}
 
+/** A grid item across the whole row. */
+private fun full(s: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope) = GridItemSpan(s.maxLineSpan)
+
+private fun countLabel(n: Int) = when (n) {
+    0 -> "Leer"
+    1 -> "1 Bild"
+    else -> "$n Bilder"
+}
+
+/** Above the phone's photos: highlights, then peek's albums. */
+@Composable
+private fun PhoneHeader(vm: GalleryViewModel, ops: MediaOps) {
+    var creating by remember { mutableStateOf(false) }
+    // Re-checked when coming back, so returning from the settings page updates it.
+    var canManage by remember { mutableStateOf(ops.canManageMedia) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        canManage = ops.canManageMedia
+        onPauseOrDispose {}
+    }
+    Column(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+        if (!canManage && !vm.manageMediaHintDismissed && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            Box(Modifier.padding(horizontal = 13.dp, vertical = 6.dp)) {
+                ManageMediaHint(onAllow = ops::requestManageMedia, onDismiss = vm::dismissManageMediaHint)
+            }
+        }
+        Strip {
+            vm.phoneMemories?.let { m ->
+                item(key = "memories") { MemoriesTile(m) { vm.open = Source.Memories(false) } }
+            }
+            item(key = "fav") {
+                StripCard("Favoriten", countLabel(vm.favorites.size), vm.favorites.firstOrNull(), Icons.Rounded.Favorite, Color(0xFFFF4D6D)) { vm.open = Source.Favorites }
+            }
+            item(key = "trash") {
+                StripCard("Papierkorb", countLabel(vm.trash.size), null, Icons.Rounded.DeleteOutline, MaterialTheme.colorScheme.onSurfaceVariant) { vm.open = Source.Trash }
+            }
+        }
+        StripTitle("Alben") { NewButton { creating = true } }
+        if (vm.userAlbums.isEmpty()) {
+            Box(Modifier.padding(horizontal = 13.dp)) { Hint("Sammle Bilder aus allen Ordnern in eigenen Alben. Die Dateien bleiben, wo sie sind.") }
+        } else {
+            val byId = remember(vm.images) { vm.images.associateBy { it.id } }
+            Strip {
+                items(vm.userAlbums, key = { it.id }) { a ->
+                    val cover = remember(a.ids, byId) { a.ids.firstNotNullOfOrNull { byId[it] } }
+                    val count = remember(a.ids, byId) { a.ids.count { it in byId } }
+                    StripCard(a.name, countLabel(count), cover, Icons.Rounded.PhotoAlbum) { vm.open = Source.User(a.id) }
+                }
+            }
+        }
+        if (vm.loaded && vm.images.isEmpty()) {
+            Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
+                Text("Noch keine Bilder auf dem Handy", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
     if (creating) {
         NameDialog(title = "Neues Album", initial = "", confirm = "Anlegen", onDismiss = { creating = false }) { name ->
             creating = false
             vm.open = Source.User(vm.createAlbum(name).id)
         }
     }
-    if (creatingTrunk) {
-        NameDialog(title = "Neues Album auf trunk", initial = "", confirm = "Anlegen", onDismiss = { creatingTrunk = false }) { name ->
-            creatingTrunk = false
+}
+
+/** Above trunk's library: uploads, memories, trunk's albums and what was sent between people. */
+@Composable
+private fun TrunkHeader(vm: GalleryViewModel) {
+    var creating by remember { mutableStateOf(false) }
+    val upload = rememberUploadProgress(vm)
+    Column(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+        if (upload != null) {
+            val (done, total) = upload
+            Column(Modifier.padding(horizontal = 13.dp, vertical = 6.dp)) {
+                Text(if (total > 0) "Lädt hoch: ${done + 1} von $total" else "Lädt hoch …", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
+                if (total > 0) {
+                    LinearProgressIndicator(progress = { (done.toFloat() / total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
+                }
+            }
+        }
+        vm.trunkMemories?.let { m ->
+            Strip { item(key = "memories") { MemoriesTile(m) { vm.open = Source.Memories(true) } } }
+        }
+        val albums = vm.trunkAlbums.filter { !it.direct }
+        StripTitle("Alben") { NewButton { creating = true } }
+        if (albums.isEmpty()) {
+            Box(Modifier.padding(horizontal = 13.dp)) { Hint("Alben auf dem Server sehen alle deine Geräte. Wähle Bilder aus und tippe auf „Album“.") }
+        } else {
+            Strip { items(albums, key = { it.id }) { a -> TrunkStripCard(vm, a) } }
+        }
+        // Photos sent between people: "Von alice", "An bob".
+        val direct = vm.trunkAlbums.filter { it.direct }
+        if (direct.isNotEmpty()) {
+            StripTitle("Geteilt")
+            Strip { items(direct, key = { it.id }) { a -> TrunkStripCard(vm, a) } }
+        }
+    }
+    if (creating) {
+        NameDialog(title = "Neues Album auf trunk", initial = "", confirm = "Anlegen", onDismiss = { creating = false }) { name ->
+            creating = false
             vm.trunkCreateAlbum(name) { id -> vm.open = Source.TrunkAlbum(id) }
         }
     }
-    if (connecting) {
-        TrunkConnectDialog(vm, onDone = { connecting = false; if (vm.trunkConnected) vm.open = Source.Trunk })
+}
+
+@Composable
+private fun TrunkStripCard(vm: GalleryViewModel, a: io.github.carnager.peek.trunk.RemoteAlbum) {
+    val images = remember(a, vm.trunk, vm.trunkShared) { vm.trunkAlbumImages(a) }
+    StripCard(a.title, countLabel(images.size), images.firstOrNull(), Icons.Rounded.PhotoAlbum, shared = a.shared && !a.direct) {
+        vm.open = Source.TrunkAlbum(a.id)
     }
 }
 
-/** A grid item across the whole row. */
-private fun full(s: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope) = GridItemSpan(s.maxLineSpan)
+@Composable
+private fun StripTitle(title: String, action: (@Composable () -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(start = 13.dp, end = 13.dp, top = 14.dp, bottom = 8.dp).heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        action?.invoke()
+    }
+}
 
-/** Handy: the phone's photos, its favourites and trash, memories from them, peek's own albums. */
-private fun androidx.compose.foundation.lazy.grid.LazyGridScope.phoneTab(vm: GalleryViewModel, ops: MediaOps, canManage: Boolean, onNewAlbum: () -> Unit) {
-    if (!canManage && !vm.manageMediaHintDismissed && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-        item(key = "hint", span = ::full) {
-            ManageMediaHint(onAllow = ops::requestManageMedia, onDismiss = vm::dismissManageMediaHint)
-        }
-    }
-    if (vm.loaded && vm.images.isEmpty() && vm.trash.isEmpty()) {
-        item(key = "empty", span = ::full) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(io.github.carnager.peek.R.drawable.mascot), null, Modifier.size(width = 120.dp, height = 84.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("Noch keine Bilder auf dem Handy", style = MaterialTheme.typography.titleMedium)
-            }
-        }
-    }
-    if (vm.images.isNotEmpty()) {
-        item(key = "all", span = ::full) {
-            // Not a screenshot: a screenshot of peek itself would show this very card again.
-            val cover = remember(vm.images) { vm.images.firstOrNull { !it.isScreenshot } ?: vm.images.first() }
-            AlbumCard("Alle Bilder", vm.images.size, cover, aspect = 1.8f) { vm.open = Source.All }
-        }
-    }
-    item(key = "quick", span = ::full) {
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            QuickTile(Icons.Rounded.Favorite, "Favoriten", vm.favorites.size, Color(0xFFFF4D6D), Modifier.weight(1f)) { vm.open = Source.Favorites }
-            QuickTile(Icons.Rounded.DeleteOutline, "Papierkorb", vm.trash.size, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f)) { vm.open = Source.Trash }
-        }
-    }
-    vm.phoneMemories?.let { m ->
-        item(key = "memories", span = ::full) { MemoriesCard(m, Modifier.animateItem()) { vm.open = Source.Memories(false) } }
-    }
-    item(key = "albumsHeader", span = ::full) { SectionHeader("Alben") { NewButton(onNewAlbum) } }
-    if (vm.userAlbums.isEmpty()) {
-        item(key = "albumsEmpty", span = ::full) {
-            Hint("Sammle Bilder aus allen Ordnern in eigenen Alben. Die Dateien bleiben, wo sie sind.")
-        }
-    }
-    items(vm.userAlbums, key = { "u:" + it.id }) { a ->
-        val byId = remember(vm.images) { vm.images.associateBy { it.id } }
-        val cover = remember(a.ids, byId) { a.ids.firstNotNullOfOrNull { byId[it] } }
-        val count = remember(a.ids, byId) { a.ids.count { it in byId } }
+/** A row of cards that scrolls sideways. */
+@Composable
+private fun Strip(content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = PaddingValues(horizontal = 13.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        content = content,
+    )
+}
+
+private val StripHeight = 136.dp
+
+@Composable
+private fun StripCard(
+    title: String,
+    subtitle: String,
+    cover: MediaImage?,
+    icon: ImageVector,
+    tint: Color = MaterialTheme.colorScheme.primary,
+    shared: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(width = 124.dp, height = StripHeight)
+            .bounceClick(pressedScale = 0.95f, onClick = onClick)
+            .clip(RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
         if (cover != null) {
-            AlbumCard(a.name, count, cover, Modifier.animateItem()) { vm.open = Source.User(a.id) }
+            Thumb(cover, Modifier.fillMaxSize(), size = 300)
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.72f))))
         } else {
-            EmptyAlbumCard(a.name, Modifier.animateItem()) { vm.open = Source.User(a.id) }
+            Icon(icon, null, tint = tint, modifier = Modifier.align(Alignment.TopStart).padding(14.dp).size(28.dp))
+        }
+        val fg = if (cover != null) Color.White else MaterialTheme.colorScheme.onSurface
+        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(title, color = fg, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = fg.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        }
+        if (shared) {
+            Icon(
+                Icons.Rounded.Group, "Geteilt", tint = Color.White,
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(24.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).padding(4.dp),
+            )
         }
     }
 }
 
-/** trunk: the library on the server, its memories, its albums and what was sent between people. */
-private fun androidx.compose.foundation.lazy.grid.LazyGridScope.trunkTab(vm: GalleryViewModel, onConnect: () -> Unit, onNewAlbum: () -> Unit) {
-    item(key = "trunk", span = ::full) {
-        val upload = rememberUploadProgress(vm)
-        TrunkCard(vm, upload) { if (vm.trunkConnected) vm.open = Source.Trunk else onConnect() }
-    }
-    if (!vm.trunkConnected) {
-        item(key = "trunkIntro", span = ::full) {
-            Hint("trunk ist dein eigener Server für Fotos und Videos: Sicherung, Alben, Teilen, auf allen Geräten. Verbinde peek oben mit deinem trunk.")
+/** "Heute vor 2 Jahren": a wider card with a photo from back then, shown only on days that have one. */
+@Composable
+private fun MemoriesTile(m: OnThisDay, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(width = 220.dp, height = StripHeight)
+            .bounceClick(pressedScale = 0.95f, onClick = onClick)
+            .clip(RoundedCornerShape(22.dp)),
+    ) {
+        Thumb(m.cover, Modifier.fillMaxSize(), size = 600)
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.3f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))))
+        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text("Rückblick", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+            Text(m.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                listOfNotNull(m.place, countLabel(m.images.size)).joinToString(" · "),
+                color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
-        return
-    }
-    vm.trunkMemories?.let { m ->
-        item(key = "memories", span = ::full) { MemoriesCard(m, Modifier.animateItem()) { vm.open = Source.Memories(true) } }
-    }
-    item(key = "trunkAlbumsHeader", span = ::full) { SectionHeader("Alben") { NewButton(onNewAlbum) } }
-    if (vm.trunkAlbums.none { !it.direct }) {
-        item(key = "trunkAlbumsEmpty", span = ::full) {
-            Hint("Alben auf dem Server sehen alle deine Geräte. Wähle Bilder in trunk aus und tippe auf „Album“.")
-        }
-    }
-    items(vm.trunkAlbums.filter { !it.direct }, key = { "t:" + it.id }) { a -> TrunkAlbumCard(vm, a, Modifier.animateItem()) }
-    // Photos sent between people: "Von alice", "An bob".
-    val direct = vm.trunkAlbums.filter { it.direct }
-    if (direct.isNotEmpty()) {
-        item(key = "directHeader", span = ::full) { SectionHeader("Geteilt") }
-        items(direct, key = { "d:" + it.id }) { a -> TrunkAlbumCard(vm, a, Modifier.animateItem()) }
-    }
-}
-
-/** Ordner: the phone's folders. */
-private fun androidx.compose.foundation.lazy.grid.LazyGridScope.foldersTab(vm: GalleryViewModel) {
-    if (vm.folders.isEmpty()) {
-        item(key = "foldersEmpty", span = ::full) { Hint("Noch keine Ordner mit Bildern auf dem Handy.") }
-    }
-    items(vm.folders, key = { "f:" + it.bucketId }) { a ->
-        AlbumCard(a.name, a.count, a.cover, Modifier.animateItem()) { vm.open = Source.Folder(a.bucketId) }
     }
 }
 
@@ -518,45 +617,8 @@ private fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp))
 }
 
-@Composable
-private fun TrunkAlbumCard(vm: GalleryViewModel, a: io.github.carnager.peek.trunk.RemoteAlbum, modifier: Modifier) {
-    val images = remember(a, vm.trunk, vm.trunkShared) { vm.trunkAlbumImages(a) }
-    val cover = images.firstOrNull()
-    if (cover != null) {
-        AlbumCard(a.title, images.size, cover, modifier, shared = a.shared && !a.direct) { vm.open = Source.TrunkAlbum(a.id) }
-    } else {
-        EmptyAlbumCard(a.title, modifier) { vm.open = Source.TrunkAlbum(a.id) }
-    }
-}
 
-@Composable
-private fun SectionHeader(title: String, action: (@Composable () -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(top = 10.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-        action?.invoke()
-    }
-}
 
-@Composable
-private fun QuickTile(icon: ImageVector, label: String, count: Int, tint: Color, modifier: Modifier, onClick: () -> Unit) {
-    Row(
-        modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .bounceClick(pressedScale = 0.95f, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(40.dp).clip(CircleShape).background(tint.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center,
-        ) { Icon(icon, null, tint = tint) }
-        Column(Modifier.padding(start = 12.dp)) {
-            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
 
 @Composable
 private fun ManageMediaHint(onAllow: () -> Unit, onDismiss: () -> Unit) {
@@ -612,51 +674,6 @@ private fun AlbumCard(name: String, count: Int, cover: MediaImage, modifier: Mod
     }
 }
 
-/** "Heute vor 2 Jahren": a wide card with a photo from back then, shown only on days that have one. */
-@Composable
-private fun MemoriesCard(m: OnThisDay, modifier: Modifier, onClick: () -> Unit) {
-    Box(
-        modifier
-            .fillMaxWidth()
-            .aspectRatio(2.2f)
-            .bounceClick(pressedScale = 0.95f, onClick = onClick)
-            .clip(RoundedCornerShape(26.dp)),
-    ) {
-        Thumb(m.cover, Modifier.fillMaxSize(), size = 900)
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))))
-        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text("Rückblick", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
-            Text(m.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                listOfNotNull(m.place, if (m.images.size == 1) "1 Bild" else "${m.images.size} Bilder").joinToString(" · "),
-                color = Color.White.copy(alpha = 0.85f),
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyAlbumCard(name: String, modifier: Modifier, onClick: () -> Unit) {
-    Box(
-        modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(26.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .bounceClick(pressedScale = 0.95f, onClick = onClick),
-    ) {
-        Icon(
-            Icons.Rounded.PhotoAlbum, null,
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-            modifier = Modifier.align(Alignment.Center).size(48.dp),
-        )
-        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("Leer", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
 
 @Composable
 fun Thumb(image: MediaImage, modifier: Modifier, size: Int = 300) {

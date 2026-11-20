@@ -207,6 +207,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     fun selectTab(t: Tab) {
+        selection = emptySet()
         tab = t
         prefs.edit().putString("tab", t.name).apply()
     }
@@ -287,7 +288,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                     viewerIndex = null
                 }
                 viewerIndex?.let { i ->
-                    if (open.onTrunk) {
+                    if (shown.onTrunk) {
                         val n = openImages.size
                         viewerIndex = if (n == 0) null else i.coerceAtMost(n - 1)
                     }
@@ -516,7 +517,15 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.let(::trunkAlbumImages) ?: emptyList()
     }
 
-    val openImages: List<MediaImage> get() = imagesOf(open)
+    /** What is on screen: an opened album or folder, else the photos of the tab (Handy: all, trunk: the library). */
+    val shown: Source?
+        get() = open ?: when (tab) {
+            Tab.Phone -> Source.All
+            Tab.Trunk -> if (trunkConnected) Source.Trunk else null
+            Tab.Folders -> null
+        }
+
+    val openImages: List<MediaImage> get() = imagesOf(shown)
 
     fun titleOf(source: Source?): String = when (source) {
         null -> "peek"

@@ -1,5 +1,7 @@
 package io.github.carnager.peek.gallery
 
+import io.github.carnager.peek.ui.brandFont
+import androidx.compose.ui.unit.sp
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -224,7 +226,16 @@ private fun Modifier.dragSelect(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
+fun PhotoGridScreen(
+    vm: GalleryViewModel,
+    ops: MediaOps,
+    source: Source,
+    // A tab's own photos: no way back, peek's actions in the bar, the tabs below.
+    root: Boolean = false,
+    grid: LazyGridState = rememberLazyGridState(),
+    header: (@Composable () -> Unit)? = null,
+    bottomBar: @Composable () -> Unit = {},
+) {
     val ctx = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -255,15 +266,17 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
         vm.trunkQuery = ""
         vm.trunkFilters = emptySet()
     }
-    BackHandler {
+    BackHandler(enabled = !root || selecting || searchOpen) {
         when {
             selecting -> vm.selection = emptySet()
             searchOpen -> closeSearch()
             else -> vm.open = null
         }
     }
-    val grid = rememberLazyGridState()
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // Grid items before the photos: the header, the trash's note.
+    val showHeader = header != null && !searchOpen
+    val offset = (if (showHeader) 1 else 0) + (if (isTrash && list.isNotEmpty()) 1 else 0)
     val edge = with(LocalDensity.current) { 72.dp.toPx() }
 
     // After closing the viewer, make sure the photo that was last on screen is visible in the grid.
@@ -275,8 +288,8 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
         } else {
             lastViewed?.let { i ->
                 val cell = cells.indexOfFirst { it is Cell.Photo && it.index == i }
-                val visible = grid.layoutInfo.visibleItemsInfo.any { it.index == cell }
-                if (cell >= 0 && !visible) grid.scrollToItem(cell)
+                val visible = grid.layoutInfo.visibleItemsInfo.any { it.index == cell + offset }
+                if (cell >= 0 && !visible) grid.scrollToItem(cell + offset)
             }
             lastViewed = null
         }
@@ -284,13 +297,14 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        bottomBar = { if (!selecting) bottomBar() },
         topBar = {
             Column {
             LargeTopAppBar(
                 navigationIcon = {
                     if (selecting) {
                         IconButton(onClick = { vm.selection = emptySet() }) { Icon(Icons.Rounded.Close, "Auswahl beenden") }
-                    } else {
+                    } else if (!root) {
                         IconButton(onClick = { vm.open = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Zurück") }
                     }
                 },
@@ -300,6 +314,8 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                             Text("${vm.selection.size} ausgewählt")
                         } else if (searchOpen) {
                             SearchField(vm.trunkQuery, onChange = { vm.trunkQuery = it }, count = list.size)
+                        } else if (root) {
+                            Text(if (isTrunk) "trunk" else "peek", fontFamily = brandFont(), fontSize = if (scroll.state.collapsedFraction < 0.5f) 40.sp else 24.sp)
                         } else {
                             Text(vm.titleOf(source), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -403,6 +419,7 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                             }
                         }
                     }
+                    if (root && !selecting && !searchOpen) RootActions(vm)
                 },
                 scrollBehavior = scroll,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
@@ -444,7 +461,7 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.Center),
                 )
-            } else if (vm.loaded && list.isEmpty()) {
+            } else if (vm.loaded && list.isEmpty() && !root) {
                 EmptyState(source, Modifier.padding(pad))
             }
             LazyVerticalGrid(
@@ -461,6 +478,9 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                     }
                     .dragSelect(grid, { latestCells }, { vm.selection }, { vm.selection = it }, haptics, scope, edge),
             ) {
+                if (showHeader) {
+                    item(key = "header", span = { GridItemSpan(maxLineSpan) }, contentType = "header") { header?.invoke() }
+                }
                 if (isTrash && list.isNotEmpty()) {
                     item(key = "trashInfo", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
@@ -506,10 +526,10 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
             FastScroller(
                 grid = grid,
                 labelAt = { idx ->
-                    val photo = cells.subList(idx.coerceIn(0, cells.lastIndex), cells.size).firstOrNull { it is Cell.Photo } as? Cell.Photo
+                    val photo = cells.subList((idx - offset).coerceIn(0, cells.lastIndex), cells.size).firstOrNull { it is Cell.Photo } as? Cell.Photo
                     photo?.let { SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(it.image.dateTaken) } ?: ""
                 },
-                count = cells.size,
+                count = cells.size + offset,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = pad.calculateTopPadding(), bottom = pad.calculateBottomPadding() + 24.dp),
             )
 
