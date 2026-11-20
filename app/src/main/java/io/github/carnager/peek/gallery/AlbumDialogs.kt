@@ -306,8 +306,9 @@ fun SendSheet(vm: GalleryViewModel, images: List<MediaImage>, onDone: () -> Unit
 }
 
 /**
- * Makes a public link to an album ([albumId]) or to [images]. Asks for a title, whether originals
- * may be downloaded (they carry the location) and how long it lasts; then offers to share it.
+ * Makes a public link to an album ([albumId]) or to [images]. Asks for a title, whether the
+ * originals that can be downloaded keep where they were taken, and how long it lasts; then
+ * offers to share it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -315,7 +316,7 @@ fun LinkSheet(vm: GalleryViewModel, albumId: Long?, images: List<MediaImage>, de
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var title by remember { mutableStateOf(defaultTitle) }
-    var download by remember { mutableStateOf(true) }
+    var stripLocation by remember { mutableStateOf(true) }
     var days by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     var url by remember { mutableStateOf<String?>(null) }
@@ -332,17 +333,17 @@ fun LinkSheet(vm: GalleryViewModel, albumId: Long?, images: List<MediaImage>, de
             if (done == null) {
                 OutlinedTextField(title, { title = it }, label = { Text("Titel") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(12.dp)).bounceClick(pressedScale = 0.98f) { download = !download },
+                    Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(12.dp)).bounceClick(pressedScale = 0.98f) { stripLocation = !stripLocation },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Download erlauben", style = MaterialTheme.typography.bodyLarge)
+                        Text("Aufnahmeort entfernen", style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "Originale enthalten den Aufnahmeort. Ohne Download gibt es nur die Ansicht.",
+                            "Die Originale lassen sich herunterladen. Ohne Ort zeigen sie nicht, wo sie entstanden sind, etwa bei dir zu Hause.",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = download, onCheckedChange = null)
+                    Switch(checked = stripLocation, onCheckedChange = null)
                 }
                 Text("Gültig", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -357,7 +358,7 @@ fun LinkSheet(vm: GalleryViewModel, albumId: Long?, images: List<MediaImage>, de
                         error = null
                         scope.launch {
                             try {
-                                url = vm.trunkCreateLink(albumId, images, title.trim().ifEmpty { defaultTitle }, download, days)
+                                url = vm.trunkCreateLink(albumId, images, title.trim().ifEmpty { defaultTitle }, stripLocation, days)
                             } catch (e: kotlinx.coroutines.CancellationException) {
                                 throw e
                             } catch (e: Exception) {
@@ -413,7 +414,7 @@ fun LinksSheet(vm: GalleryViewModel, onDone: () -> Unit) {
                         Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                             Text(l.optString("title"), style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                listOfNotNull(count, until?.let { "bis $it" } ?: "unbegrenzt", if (l.optBoolean("download")) "mit Download" else "nur ansehen").joinToString(" · "),
+                                listOfNotNull(count, until?.let { "bis $it" } ?: "unbegrenzt", if (l.optBoolean("strip_location", true)) "ohne Ort" else "mit Ort").joinToString(" · "),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {

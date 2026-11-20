@@ -366,8 +366,8 @@ object TrunkClient {
     }
 
     /** A public link to an album or to some photos. Its address is the server's plus "path". */
-    suspend fun createLink(albumId: Long?, assetIds: List<Long>?, title: String, download: Boolean, expiresDays: Int): JSONObject = withContext(Dispatchers.IO) {
-        val body = JSONObject().put("title", title).put("download", download).put("expires_days", expiresDays)
+    suspend fun createLink(albumId: Long?, assetIds: List<Long>?, title: String, stripLocation: Boolean, expiresDays: Int): JSONObject = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("title", title).put("strip_location", stripLocation).put("expires_days", expiresDays)
         if (albumId != null) body.put("album_id", albumId) else body.put("asset_ids", JSONArray(assetIds))
         call(Request.Builder().url(TrunkAccount.api("/links")).post(body.toString().toRequestBody(json)).build())
     }

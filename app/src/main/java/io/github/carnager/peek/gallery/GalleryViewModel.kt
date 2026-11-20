@@ -400,10 +400,10 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Makes a public link and returns its address; for an album, or for our own photos among [images]. */
-    suspend fun trunkCreateLink(albumId: Long?, images: List<MediaImage>, title: String, download: Boolean, expiresDays: Int): String {
+    suspend fun trunkCreateLink(albumId: Long?, images: List<MediaImage>, title: String, stripLocation: Boolean, expiresDays: Int): String {
         val ids = if (albumId == null) remoteIds(ownOnly(images).map { it.id }) else null
         if (albumId == null && ids.isNullOrEmpty()) error("Keine eigenen Bilder ausgewählt")
-        val o = TrunkClient.createLink(albumId, ids, title, download, expiresDays)
+        val o = TrunkClient.createLink(albumId, ids, title, stripLocation, expiresDays)
         return TrunkAccount.linkUrl(o.getString("path"))
     }
 
