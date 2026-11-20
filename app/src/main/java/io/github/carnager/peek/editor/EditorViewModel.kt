@@ -103,8 +103,12 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         refreshPreview()
     }
 
+    val zoom = ViewZoom()
+
     private suspend fun refreshPreview() {
         val bmp = current ?: return
+        // A new step can change the image's shape, so start from the full view again.
+        zoom.reset()
         preview = withContext(Dispatchers.Default) { ImageOps.downscale(bmp, previewSide) }
     }
 

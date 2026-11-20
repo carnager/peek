@@ -67,6 +67,7 @@ fun AdjustTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         ImageStage(
             bitmap = if (compare) bmp else processed,
             modifier = Modifier.weight(1f),
+            zoom = vm.zoom,
             colorMatrix = if (compare) null else adj.matrix(),
             vignette = if (compare) 0f else adj.vignette,
             gestures = Modifier.holdToCompare { compare = it },
@@ -112,6 +113,7 @@ fun FilterTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         ImageStage(
             bitmap = bmp,
             modifier = Modifier.weight(1f),
+            zoom = vm.zoom,
             colorMatrix = if (compare) null else preset.matrix(intensity),
             vignette = if (compare) 0f else preset.vignette * intensity,
             gestures = Modifier.holdToCompare { compare = it },

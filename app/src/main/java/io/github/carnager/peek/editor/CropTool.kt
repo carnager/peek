@@ -33,6 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.height
@@ -71,6 +74,10 @@ fun ImageStage(
     vignette: Float = 0f,
     /** Straightening angle in degrees; the image is zoomed so the frame stays filled. */
     angle: Float = 0f,
+    /** Shared view zoom; null disables pinch-zoom on this stage. */
+    zoom: ViewZoom? = null,
+    /** Whether two fingers may zoom right now (the text tool wants them for its layers). */
+    zoomEnabled: () -> Boolean = { true },
     gestures: Modifier = Modifier,
     onRect: (RectF) -> Unit = {},
     overlay: androidx.compose.ui.graphics.drawscope.DrawScope.(RectF) -> Unit = {},
@@ -79,12 +86,20 @@ fun ImageStage(
     BoxWithConstraints(modifier.fillMaxSize()) {
         val boxW = constraints.maxWidth.toFloat()
         val boxH = constraints.maxHeight.toFloat()
-        val rect = remember(bitmap, boxW, boxH, padPx) {
+        val base = remember(bitmap, boxW, boxH, padPx) {
             ImageOps.fitRect(bitmap.width, bitmap.height, boxW - 2 * padPx, boxH - 2 * padPx).apply { offset(padPx, padPx) }
         }
+        val rect = if (zoom != null) zoom.apply(base) else base
         androidx.compose.runtime.SideEffect { onRect(rect) }
         val paint = remember { Paint(Paint.FILTER_BITMAP_FLAG) }
-        Canvas(Modifier.fillMaxSize().then(gestures)) {
+        val baseState by rememberUpdatedState(base)
+        val enabledState by rememberUpdatedState(zoomEnabled)
+        Canvas(
+            Modifier.fillMaxSize()
+                .clipToBounds()
+                .viewZoom(zoom, { enabledState() }, { baseState }, { boxW to boxH })
+                .then(gestures)
+        ) {
             drawIntoCanvas { c ->
                 paint.colorFilter = colorMatrix?.let { ColorMatrixColorFilter(it) }
                 val nc = c.nativeCanvas
@@ -102,6 +117,25 @@ fun ImageStage(
                 ImageOps.drawVignette(c.nativeCanvas, rect.left, rect.top, rect.width(), rect.height(), vignette)
             }
             overlay(rect)
+        }
+        if (zoom != null) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = zoom.isZoomed,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(),
+                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+            ) {
+                Text(
+                    "%.1f×".format(zoom.scale),
+                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    modifier = Modifier
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .clickable { zoom.reset() }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
         }
     }
 }
@@ -227,6 +261,7 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         ImageStage(
             bitmap = shown,
             padding = 28.dp,
+            zoom = vm.zoom,
             angle = angle,
             modifier = Modifier.weight(1f),
             onRect = { imgRect = it },
@@ -319,10 +354,10 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(top = 6.dp),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            IconButton(onClick = { turns = (turns + 3) % 4; crop = RectF(0f, 0f, 1f, 1f); aspectIndex = 0 }) {
+            IconButton(onClick = { vm.zoom.reset(); turns = (turns + 3) % 4; crop = RectF(0f, 0f, 1f, 1f); aspectIndex = 0 }) {
                 Icon(Icons.AutoMirrored.Rounded.RotateLeft, "Links drehen")
             }
-            IconButton(onClick = { turns = (turns + 1) % 4; crop = RectF(0f, 0f, 1f, 1f); aspectIndex = 0 }) {
+            IconButton(onClick = { vm.zoom.reset(); turns = (turns + 1) % 4; crop = RectF(0f, 0f, 1f, 1f); aspectIndex = 0 }) {
                 Icon(Icons.AutoMirrored.Rounded.RotateRight, "Rechts drehen")
             }
             IconButton(onClick = { flipH = !flipH; crop = RectF(1 - crop.right, crop.top, 1 - crop.left, crop.bottom) }) {

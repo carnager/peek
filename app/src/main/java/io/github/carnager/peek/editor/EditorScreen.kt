@@ -131,6 +131,8 @@ fun EditorScreen(
                         Box(Modifier.weight(1f)) {
                             ImageStage(
                                 bitmap = if (compare) vm.originalPreview ?: preview else preview,
+                                // The original may have a different shape, so it is shown unzoomed.
+                                zoom = if (compare) null else vm.zoom,
                                 gestures = Modifier.holdToCompare { compare = it },
                             )
                             androidx.compose.animation.AnimatedVisibility(

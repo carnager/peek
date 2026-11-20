@@ -132,6 +132,7 @@ fun DrawTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         ImageStage(
             bitmap = bmp,
             modifier = Modifier.weight(1f),
+            zoom = vm.zoom,
             onRect = { imgRect = it },
             gestures = Modifier.pointerInput(Unit) {
                 awaitEachGesture {
@@ -226,6 +227,9 @@ fun TextTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         ImageStage(
             bitmap = bmp,
             modifier = Modifier.weight(1f),
+            zoom = vm.zoom,
+            // Two fingers belong to the selected text layer; without one they zoom the view.
+            zoomEnabled = { vm.selectedText == null },
             onRect = { imgRect = it },
             gestures = Modifier.pointerInput(Unit) {
                 awaitEachGesture {
