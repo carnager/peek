@@ -240,4 +240,30 @@
     </plurals>
     <string name="gallery_cleanup_motion">Video steckt im Foto</string>
     <string name="gallery_cleanup_motion_text">Dieses Video ist auch der Bewegungsteil des Fotos; das Foto spielt es ab.</string>
+    <string name="gallery_adjust_short">Datum &amp; Ort</string>
+    <string name="gallery_adjust_hint">Ändert nur, was trunk sich merkt; die Dateien behalten ihre eigenen Angaben.</string>
+    <string name="gallery_adjust_when">Wann</string>
+    <string name="gallery_adjust_where">Wo</string>
+    <string name="gallery_adjust_earliest">Frühestes: %1$s</string>
+    <string name="gallery_adjust_keep_distance">Die anderen behalten ihren Abstand zum frühesten, die Reihenfolge bleibt.</string>
+    <string name="gallery_adjust_set_date">Datum und Uhrzeit setzen</string>
+    <string name="gallery_adjust_minus_day">−1 Tag</string>
+    <string name="gallery_adjust_minus_hour">−1 Std.</string>
+    <string name="gallery_adjust_plus_hour">+1 Std.</string>
+    <string name="gallery_adjust_plus_day">+1 Tag</string>
+    <string name="gallery_adjust_no_place">Kein Ort</string>
+    <string name="gallery_adjust_various">Verschiedene Orte</string>
+    <string name="gallery_adjust_search_town">Ort suchen</string>
+    <string name="gallery_adjust_remove_place">Ort entfernen</string>
+    <string name="gallery_adjust_save">Speichern</string>
+    <string name="gallery_adjust_next">Weiter</string>
+    <string name="gallery_adjust_ok">OK</string>
+    <plurals name="gallery_adjust_title">
+        <item quantity="one">Datum &amp; Ort</item>
+        <item quantity="other">Datum &amp; Ort von %1$d Bildern</item>
+    </plurals>
+    <plurals name="gallery_adjusted">
+        <item quantity="one">%1$d Bild korrigiert</item>
+        <item quantity="other">%1$d Bilder korrigiert</item>
+    </plurals>
 </resources>

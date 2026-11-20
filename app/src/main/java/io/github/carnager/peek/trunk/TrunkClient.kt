@@ -410,6 +410,36 @@ object TrunkClient {
         call(Request.Builder().url(TrunkAccount.api("/similar")).build())
     }
 
+    /** A town found by name: [label] is "Wien, Österreich" in the phone's language. */
+    data class PlaceHit(val id: Long, val city: String, val region: String?, val country: String?) {
+        val label get() = listOfNotNull(city, region?.takeIf { it.isNotBlank() }, country?.takeIf { it.isNotBlank() }).joinToString(", ")
+    }
+
+    /** Towns by name, in any language; exact names first, then bigger towns. */
+    suspend fun places(query: String): List<PlaceHit> = withContext(Dispatchers.IO) {
+        val url = TrunkAccount.api("/places").toHttpUrl().newBuilder().addQueryParameter("q", query).addQueryParameter("limit", "8").build()
+        val arr = call(Request.Builder().url(url).build()).optJSONArray("places") ?: JSONArray()
+        List(arr.length()) { i ->
+            val o = arr.getJSONObject(i)
+            PlaceHit(o.getLong("id"), o.optString("city"), o.optString("region").ifEmpty { null }, o.optString("country").ifEmpty { null })
+        }
+    }
+
+    /**
+     * Corrects when or where photos were taken: [localTime] ("2023-05-01T14:00:00") for the earliest,
+     * the others keeping their distance, or [shiftMinutes] for all; [placeId] or [clearPlace].
+     * Returns the photos as they are now.
+     */
+    suspend fun adjust(ids: Collection<Long>, localTime: String?, shiftMinutes: Long?, placeId: Long?, clearPlace: Boolean): JSONArray = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("ids", JSONArray(ids))
+        localTime?.let { body.put("local_time", it) }
+        shiftMinutes?.let { body.put("shift_minutes", it) }
+        placeId?.let { body.put("place_id", it) }
+        if (clearPlace) body.put("clear_place", true)
+        call(Request.Builder().url(TrunkAccount.api("/assets/adjust")).post(body.toString().toRequestBody(json)).build())
+            .optJSONArray("assets") ?: JSONArray()
+    }
+
     /** These photos are no look-alikes of each other: their group goes away for good. */
     suspend fun similarIgnore(ids: Collection<Long>) = idsCall("/similar/ignore", ids)
     suspend fun restore(ids: Collection<Long>) = idsCall("/assets/restore", ids)

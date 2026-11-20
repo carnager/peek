@@ -242,4 +242,30 @@
     </plurals>
     <string name="gallery_cleanup_motion">Video inside a photo</string>
     <string name="gallery_cleanup_motion_text">This video is also the motion part of the photo; the photo plays it.</string>
+    <string name="gallery_adjust_short">Date &amp; place</string>
+    <string name="gallery_adjust_hint">Changes trunk\'s records only; the files keep their own metadata.</string>
+    <string name="gallery_adjust_when">When</string>
+    <string name="gallery_adjust_where">Where</string>
+    <string name="gallery_adjust_earliest">Earliest: %1$s</string>
+    <string name="gallery_adjust_keep_distance">The others keep their distance to the earliest, so the series stays in order.</string>
+    <string name="gallery_adjust_set_date">Set date and time</string>
+    <string name="gallery_adjust_minus_day">−1 day</string>
+    <string name="gallery_adjust_minus_hour">−1 h</string>
+    <string name="gallery_adjust_plus_hour">+1 h</string>
+    <string name="gallery_adjust_plus_day">+1 day</string>
+    <string name="gallery_adjust_no_place">No place</string>
+    <string name="gallery_adjust_various">Various places</string>
+    <string name="gallery_adjust_search_town">Search a town</string>
+    <string name="gallery_adjust_remove_place">Remove place</string>
+    <string name="gallery_adjust_save">Save</string>
+    <string name="gallery_adjust_next">Next</string>
+    <string name="gallery_adjust_ok">OK</string>
+    <plurals name="gallery_adjust_title">
+        <item quantity="one">Date &amp; place</item>
+        <item quantity="other">Date &amp; place of %1$d photos</item>
+    </plurals>
+    <plurals name="gallery_adjusted">
+        <item quantity="one">%1$d photo corrected</item>
+        <item quantity="other">%1$d photos corrected</item>
+    </plurals>
 </resources>

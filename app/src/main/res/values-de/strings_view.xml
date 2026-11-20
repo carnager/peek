@@ -144,4 +144,5 @@
     <string name="view_location_hint">Tippen, um peek Standortdaten in Fotos lesen zu lassen.</string>
     <string name="view_edited_with">Bearbeitet mit %1$s</string>
     <string name="view_motion">Bewegung abspielen</string>
+    <string name="view_adjust">Datum &amp; Ort</string>
 </resources>

@@ -1,5 +1,6 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.material.icons.rounded.EditCalendar
 import io.github.carnager.peek.ui.brandFont
 import androidx.compose.ui.unit.sp
 import android.text.format.DateUtils
@@ -264,6 +265,7 @@ fun PhotoGridScreen(
     var sharing by remember { mutableStateOf(false) }
     var sending by remember { mutableStateOf<List<MediaImage>?>(null) }
     var linking by remember { mutableStateOf<Pair<Long?, List<MediaImage>>?>(null) }
+    var adjusting by remember { mutableStateOf<List<MediaImage>?>(null) }
     var confirmEnd by remember { mutableStateOf(false) }
     var confirmEmpty by remember { mutableStateOf(false) }
     fun closeSearch() {
@@ -573,6 +575,7 @@ fun PhotoGridScreen(
                                 vm.trunkFavorite(selected, !allFav)
                             }
                             PillAction(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_album)) { vm.addToAlbum = selected.map { it.id } }
+                            PillAction(Icons.Rounded.EditCalendar, stringResource(R.string.gallery_adjust_short)) { adjusting = selected }
                             PillAction(Icons.AutoMirrored.Rounded.Send, stringResource(R.string.gallery_send)) { sending = selected }
                             PillAction(Icons.Rounded.Link, stringResource(R.string.gallery_link)) { linking = null to selected }
                             if (trunkAlbum != null) {
@@ -627,6 +630,7 @@ fun PhotoGridScreen(
     }
     if (sharing && trunkAlbum != null) ShareAlbumSheet(vm, trunkAlbum) { sharing = false }
     sending?.let { imgs -> SendSheet(vm, imgs) { sending = null } }
+    adjusting?.let { imgs -> AdjustSheet(vm, imgs) { adjusting = null } }
     linking?.let { (albumId, imgs) ->
         LinkSheet(vm, albumId, imgs, if (albumId != null) trunkAlbum?.name ?: stringResource(R.string.gallery_link_default_photos) else stringResource(R.string.gallery_link_default_photos)) {
             linking = null

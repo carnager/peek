@@ -600,6 +600,17 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         similar = similar?.filter { it !== g }
     }
 
+    /** Corrects date or place of photos on trunk; see [TrunkClient.adjust]. */
+    fun trunkAdjust(images: List<MediaImage>, localTime: String?, shiftMinutes: Long?, placeId: Long?, clearPlace: Boolean) = trunkCall {
+        val ids = ownOnly(images).mapNotNull { it.remote?.id }
+        if (ids.isEmpty()) return@trunkCall
+        val arr = TrunkClient.adjust(ids, localTime, shiftMinutes, placeId, clearPlace)
+        for (i in 0 until arr.length()) TrunkLibrary.put(getApplication(), arr.getJSONObject(i))
+        trunkAll = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+        selection = emptySet()
+        message = Message(plural(R.plurals.gallery_adjusted, ids.size, ids.size))
+    }
+
     /** Takes photos out of trunk's trash again. */
     fun trunkRestore(images: List<MediaImage>) = trunkCall {
         val ids = images.mapNotNull { it.remote?.id }

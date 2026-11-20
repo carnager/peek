@@ -125,6 +125,7 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
 fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
     // Sheets the viewer opens for trunk photos.
     var viewerSend by remember { mutableStateOf<List<MediaImage>?>(null) }
+    var viewerAdjust by remember { mutableStateOf<List<MediaImage>?>(null) }
     var viewerLink by remember { mutableStateOf<List<MediaImage>?>(null) }
     val ctx = LocalContext.current
     // One scroll position per tab, kept while an album or folder is open.
@@ -235,6 +236,9 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                             onRevertEdit = if (!vm.shown.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { vm.trunkRevertEdit(it) }
                             },
+                            onAdjust = if (!vm.shown.onTrunk) null else { item ->
+                                list.firstOrNull { it.uri == item.uri }?.let { viewerAdjust = listOf(it) }
+                            },
                             // Phone photos go into peek's albums, server photos into trunk's.
                             onAddToAlbum = { item -> list.firstOrNull { it.uri == item.uri }?.let { vm.addToAlbum = listOf(it.id) } },
                             onPageChange = { if (vm.viewerIndex != null) vm.viewerIndex = it },
@@ -295,6 +299,7 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
         AddToAlbumSheet(vm, ids) { vm.addToAlbum = null }
     }
     viewerSend?.let { SendSheet(vm, it) { viewerSend = null } }
+    viewerAdjust?.let { AdjustSheet(vm, it) { viewerAdjust = null } }
     viewerLink?.let { LinkSheet(vm, null, it, stringResource(R.string.gallery_link_default_photo)) { viewerLink = null } }
 }
 

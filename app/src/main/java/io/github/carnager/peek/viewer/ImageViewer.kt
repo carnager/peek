@@ -1,5 +1,6 @@
 package io.github.carnager.peek.viewer
 
+import androidx.compose.material.icons.rounded.EditCalendar
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.rounded.MotionPhotosPause
@@ -163,6 +164,8 @@ fun ImageViewer(
     onShare: ((ViewerItem) -> Unit)? = null,
     /** Offered for [ViewerItem.edited] items: go back to the first upload. */
     onRevertEdit: ((ViewerItem) -> Unit)? = null,
+    /** Corrects date and place (trunk photos). */
+    onAdjust: ((ViewerItem) -> Unit)? = null,
     /** Saves a caption; null where captions cannot be stored (phone photos). */
     onCaption: ((ViewerItem, String) -> Unit)? = null,
 ) {
@@ -344,6 +347,13 @@ fun ImageViewer(
                                 text = { Text(stringResource(R.string.view_add_to_album)) },
                                 leadingIcon = { Icon(Icons.Rounded.PhotoAlbum, null) },
                                 onClick = { menu = false; onAddToAlbum(current) },
+                            )
+                        }
+                        if (onAdjust != null && current.remote && current.owner == null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.view_adjust)) },
+                                leadingIcon = { Icon(Icons.Rounded.EditCalendar, null) },
+                                onClick = { menu = false; onAdjust(current) },
                             )
                         }
                         if (onRevertEdit != null && current.edited && current.owner == null) {
