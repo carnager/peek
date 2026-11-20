@@ -30,6 +30,17 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     private var job: Job? = null
 
+    /** Where each visible thumbnail sits on screen, for the open/close animation. Not observed. */
+    val thumbBounds = HashMap<Long, androidx.compose.ui.geometry.Rect>()
+
+    /** The photo currently flying between grid and viewer, if any. */
+    var hero by mutableStateOf<Hero?>(null)
+
+    fun openViewer(index: Int, image: MediaImage) {
+        thumbBounds[image.id]?.let { hero = Hero(image, it, opening = true) }
+        viewerIndex = index
+    }
+
     private val prefs = app.getSharedPreferences("gallery", 0)
 
     /** Thumbnail columns in an album, changed by pinching the grid. */
@@ -87,3 +98,13 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         selection = if (id in selection) selection - id else selection + id
     }
 }
+
+data class Hero(
+    val image: MediaImage,
+    /** Opening: the thumbnail's bounds. Closing: where the photo was in the viewer. */
+    val from: androidx.compose.ui.geometry.Rect,
+    val opening: Boolean,
+    /** Viewer background opacity at the start of a close (lower after a swipe). */
+    val backdrop: Float = 1f,
+    val token: Long = System.nanoTime(),
+)

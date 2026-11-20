@@ -110,6 +110,8 @@ data class ViewerItem(
     val path: String? = null,
     /** Version tag so an edited file reloads instead of showing the cached old pixels. */
     val version: Long = 0,
+    /** Memory-cache key of an already loaded thumbnail, shown until the full image is ready. */
+    val placeholderKey: String? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,6 +123,8 @@ fun ImageViewer(
     onEdit: (ViewerItem) -> Unit,
     onDelete: ((ViewerItem) -> Unit)?,
     onPageChange: (Int) -> Unit = {},
+    /** Called instead of [onClose] after a swipe-away, with the photo's offset, scale and backdrop opacity. */
+    onSwipeClose: ((offsetY: Float, scale: Float, backdrop: Float) -> Unit)? = null,
 ) {
     if (items.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
@@ -153,7 +157,8 @@ fun ImageViewer(
                 onDragStarted = { chrome = false },
                 onDragStopped = { velocity ->
                     if (abs(drag.value) > dismissPx || abs(velocity) > 2500f) {
-                        onClose()
+                        val p = (abs(drag.value) / (dismissPx * 2.5f)).coerceIn(0f, 1f)
+                        onSwipeClose?.invoke(drag.value, 1f - p * 0.25f, 1f - p) ?: onClose()
                     } else {
                         chrome = true
                         drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
@@ -183,6 +188,7 @@ fun ImageViewer(
                     model = coil3.request.ImageRequest.Builder(ctx)
                         .data(item.uri)
                         .memoryCacheKey("${item.uri}#${item.version}")
+                        .placeholderMemoryCacheKey(item.placeholderKey)
                         .build(),
                     contentDescription = item.name,
                     state = state,

@@ -48,6 +48,7 @@ object MediaRepository {
             MediaStore.Images.Media.DATE_TAKEN,
             MediaStore.Images.Media.DATE_MODIFIED,
             MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.ORIENTATION,
         )
         val selection = bucketId?.let { "${MediaStore.Images.Media.BUCKET_ID} = ?" }
         val args = bucketId?.let { arrayOf(it.toString()) }
@@ -67,6 +68,7 @@ object MediaRepository {
             val takenCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
             val modCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
             val addedCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+            val orientCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.ORIENTATION)
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
                 // DATE_ADDED survives an overwrite, so a replaced original keeps its place in the list.
@@ -81,8 +83,9 @@ object MediaRepository {
                     bucketName = c.getString(bucketNameCol) ?: "",
                     relativePath = c.getString(pathCol),
                     mimeType = c.getString(mimeCol) ?: "image/*",
-                    width = c.getInt(wCol),
-                    height = c.getInt(hCol),
+                    // WIDTH/HEIGHT are the stored pixels; a 90° EXIF rotation swaps what is shown.
+                    width = if (c.getInt(orientCol) % 180 == 90) c.getInt(hCol) else c.getInt(wCol),
+                    height = if (c.getInt(orientCol) % 180 == 90) c.getInt(wCol) else c.getInt(hCol),
                     size = c.getLong(sizeCol),
                     dateTaken = taken,
                     modified = c.getLong(modCol),

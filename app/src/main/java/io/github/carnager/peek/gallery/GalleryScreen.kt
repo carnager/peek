@@ -70,6 +70,17 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.lerp
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,7 +110,10 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
-fun MediaImage.toViewerItem() = ViewerItem(
+fun thumbSize(columns: Int) = if (columns <= 3) 480 else 300
+fun thumbKey(image: MediaImage, size: Int) = "thumb$size:${image.uri}#${image.modified}"
+
+fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
     uri = uri,
     name = name,
     mimeType = mimeType,
@@ -109,6 +123,7 @@ fun MediaImage.toViewerItem() = ViewerItem(
     date = dateTaken,
     path = relativePath?.trimEnd('/'),
     version = modified,
+    placeholderKey = placeholderKey,
 )
 
 @Composable
@@ -134,27 +149,112 @@ fun GalleryScreen(
         }
 
         // The viewer sits on top of the album so the grid keeps its scroll position underneath.
-        // Remembered without state so the exit animation still knows which page it is closing.
         val last = remember { IntArray(1) }
         vm.viewerIndex?.let { last[0] = it }
-        AnimatedVisibility(
-            visible = vm.viewerIndex != null,
-            enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) + scaleIn(spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow), initialScale = 0.88f),
-            exit = fadeOut() + scaleOut(targetScale = 0.9f),
-        ) {
-            val list = vm.albumImages
-            key(vm.viewerKey) {
-                ImageViewer(
-                    items = remember(list) { list.map { it.toViewerItem() } },
-                    startIndex = last[0],
-                    onClose = { vm.viewerIndex = null },
-                    onEdit = { onEdit(it.uri) },
-                    onDelete = { onDelete(listOf(it.uri)) },
-                    onPageChange = { if (vm.viewerIndex != null) vm.viewerIndex = it },
+        val hero = vm.hero
+        val heroProgress = remember { Animatable(0f) }
+        LaunchedEffect(hero?.token) {
+            val h = hero ?: return@LaunchedEffect
+            if (h.opening) {
+                heroProgress.snapTo(0f)
+                heroProgress.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 420f))
+            } else {
+                heroProgress.snapTo(1f)
+                heroProgress.animateTo(0f, spring(dampingRatio = 0.9f, stiffness = 500f))
+            }
+            if (vm.hero?.token == h.token) vm.hero = null
+        }
+
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val screenW = constraints.maxWidth.toFloat()
+            val screenH = constraints.maxHeight.toFloat()
+
+            if (vm.viewerIndex != null) {
+                val list = vm.albumImages
+                val ph = thumbSize(vm.columns)
+                key(vm.viewerKey) {
+                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (vm.hero?.opening == true) 0f else 1f }) {
+                        ImageViewer(
+                            items = remember(list, ph) { list.map { it.toViewerItem(thumbKey(it, ph)) } },
+                            startIndex = last[0],
+                            onClose = {
+                                closeHero(vm, list, screenW, screenH, 0f, 1f, 1f)
+                                vm.viewerIndex = null
+                            },
+                            onSwipeClose = { dy, sc, bg ->
+                                closeHero(vm, list, screenW, screenH, dy, sc, bg)
+                                vm.viewerIndex = null
+                            },
+                            onEdit = { onEdit(it.uri) },
+                            onDelete = { onDelete(listOf(it.uri)) },
+                            onPageChange = { if (vm.viewerIndex != null) vm.viewerIndex = it },
+                        )
+                    }
+                }
+            }
+
+            if (hero != null) {
+                val p = heroProgress.value
+                val target = fitRect(hero.image, screenW, screenH)
+                val (rect, backdrop, imgAlpha) = if (hero.opening) {
+                    Triple(lerpRect(hero.from, target, p), p, 1f)
+                } else {
+                    // The grid cell is read live, so it follows the grid scrolling the photo into view.
+                    val cell = vm.thumbBounds[hero.image.id]
+                    Triple(lerpRect(cell ?: hero.from, hero.from, p), p * hero.backdrop, if (cell == null) p else 1f)
+                }
+                val density = LocalDensity.current
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = backdrop.coerceIn(0f, 1f))))
+                val size = thumbSize(vm.columns)
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(hero.image.uri)
+                        .memoryCacheKey(thumbKey(hero.image, size))
+                        .placeholderMemoryCacheKey(thumbKey(hero.image, size))
+                        .size(size)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
+                        .size(with(density) { rect.width.toDp() }, with(density) { rect.height.toDp() })
+                        .graphicsLayer { alpha = imgAlpha.coerceIn(0f, 1f) }
+                        .clip(RoundedCornerShape(lerp(4.dp, 0.dp, p.coerceIn(0f, 1f)))),
                 )
             }
         }
     }
+}
+
+/** Where the viewer shows [image] when it is fitted to the screen. */
+private fun fitRect(image: MediaImage, w: Float, h: Float): Rect {
+    if (image.width <= 0 || image.height <= 0) return Rect(0f, 0f, w, h)
+    val s = minOf(w / image.width, h / image.height)
+    val iw = image.width * s
+    val ih = image.height * s
+    return Rect((w - iw) / 2, (h - ih) / 2, (w + iw) / 2, (h + ih) / 2)
+}
+
+private fun lerpRect(a: Rect, b: Rect, t: Float) = Rect(
+    a.left + (b.left - a.left) * t,
+    a.top + (b.top - a.top) * t,
+    a.right + (b.right - a.right) * t,
+    a.bottom + (b.bottom - a.bottom) * t,
+)
+
+/** Starts the fly-back from the viewer's current photo position into its grid cell. */
+private fun closeHero(vm: GalleryViewModel, list: List<MediaImage>, w: Float, h: Float, dy: Float, scale: Float, backdrop: Float) {
+    val image = list.getOrNull(vm.viewerIndex ?: return) ?: return
+    val fit = fitRect(image, w, h)
+    val cx = w / 2
+    val cy = h / 2
+    val from = Rect(
+        cx + (fit.left - cx) * scale,
+        cy + (fit.top - cy) * scale + dy,
+        cx + (fit.right - cx) * scale,
+        cy + (fit.bottom - cy) * scale + dy,
+    )
+    vm.hero = Hero(image, from, opening = false, backdrop = backdrop)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -236,7 +336,7 @@ private fun Thumb(image: MediaImage, modifier: Modifier, size: Int = 300) {
     AsyncImage(
         model = ImageRequest.Builder(ctx)
             .data(image.uri)
-            .memoryCacheKey("thumb$size:${image.uri}#${image.modified}")
+            .memoryCacheKey(thumbKey(image, size))
             .size(size)
             .crossfade(true)
             .build(),
@@ -389,7 +489,10 @@ private fun AlbumScreen(vm: GalleryViewModel, album: Long, onDelete: (List<Uri>)
                             selected = c.image.id in vm.selection,
                             columns = vm.columns,
                             modifier = Modifier.animateItem(),
-                            onClick = { if (selecting) vm.toggle(c.image.id) else vm.viewerIndex = c.index },
+                            hidden = vm.hero?.image?.id == c.image.id,
+                            onBounds = { vm.thumbBounds[c.image.id] = it },
+                            onGone = { vm.thumbBounds.remove(c.image.id) },
+                            onClick = { if (selecting) vm.toggle(c.image.id) else vm.openViewer(c.index, c.image) },
                             onLongClick = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 vm.toggle(c.image.id)
@@ -441,21 +544,30 @@ private fun PhotoCell(
     selected: Boolean,
     columns: Int,
     modifier: Modifier,
+    hidden: Boolean,
+    onBounds: (Rect) -> Unit,
+    onGone: () -> Unit,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    DisposableEffect(image.id) { onDispose(onGone) }
     val inset by animateFloatAsState(if (selected) 0.86f else 1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium), label = "sel")
     val corner by animateDpAsState(if (selected) 18.dp else 4.dp, label = "corner")
     Box(
         modifier
             .aspectRatio(1f)
+            .onGloballyPositioned { c ->
+                val p = c.positionInRoot()
+                onBounds(Rect(p.x, p.y, p.x + c.size.width, p.y + c.size.height))
+            }
+            .graphicsLayer { alpha = if (hidden) 0f else 1f }
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, RoundedCornerShape(4.dp))
             .bounceClick(pressedScale = 0.94f, onClick = onClick, onLongClick = onLongClick)
     ) {
         Thumb(
             image,
             Modifier.fillMaxSize().graphicsLayer { scaleX = inset; scaleY = inset }.clip(RoundedCornerShape(corner)),
-            size = if (columns <= 3) 480 else 300,
+            size = thumbSize(columns),
         )
         if (image.mimeType == "image/gif") {
             Icon(Icons.Rounded.GifBox, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp).size(18.dp))
