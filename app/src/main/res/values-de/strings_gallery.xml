@@ -267,4 +267,10 @@
         <item quantity="other">%1$d Bilder korrigiert</item>
     </plurals>
     <string name="gallery_new_count">%1$d neu</string>
+    <string name="gallery_content_enable">Nach Inhalt suchen</string>
+    <string name="gallery_content_downloading">Lädt %1$d %%</string>
+    <string name="gallery_content_on">Nach Inhalt: %1$d</string>
+    <string name="gallery_content_title">Nach dem suchen, was auf den Bildern ist?</string>
+    <string name="gallery_content_text">peek lädt ein Sprachmodell von deinem trunk (%1$d MB, einmalig) und versteht damit auf diesem Handy Suchen wie „Hund am Strand“ oder „Schnee im Wald“. Deine Suchen gehen nur an deinen trunk. Bisher sind %2$d Bilder durchsuchbar; trunk-ai ergänzt neue.</string>
+    <string name="gallery_content_download">Laden</string>
 </resources>

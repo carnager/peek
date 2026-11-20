@@ -269,4 +269,10 @@
         <item quantity="other">%1$d photos corrected</item>
     </plurals>
     <string name="gallery_new_count">%1$d new</string>
+    <string name="gallery_content_enable">Search by content</string>
+    <string name="gallery_content_downloading">Downloading %1$d%%</string>
+    <string name="gallery_content_on">By content: %1$d</string>
+    <string name="gallery_content_title">Search by what is in the photos?</string>
+    <string name="gallery_content_text">peek downloads a language model from your trunk (%1$d MB, once) and uses it on this phone to understand searches like “Hund am Strand” or “snow in the forest”. Your searches go to your trunk only. %2$d photos are searchable so far; trunk-ai adds new ones.</string>
+    <string name="gallery_content_download">Download</string>
 </resources>

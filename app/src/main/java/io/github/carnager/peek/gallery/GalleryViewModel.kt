@@ -1,5 +1,7 @@
 package io.github.carnager.peek.gallery
 
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
 import android.provider.MediaStore
 import android.app.Application
 import android.net.Uri
@@ -256,7 +258,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             val r = img.remote!!
             (TrunkFilter.Photos !in f || !r.isVideo) && (TrunkFilter.Videos !in f || r.isVideo) &&
                 (TrunkFilter.Favorites !in f || r.favorite) &&
-                words.all { w -> w in r.searchText || albumsOf[r.id]?.contains(w) == true }
+                (words.all { w -> w in r.searchText || albumsOf[r.id]?.contains(w) == true } || r.id in contentHits)
         }
         return when (trunkSort) {
             TrunkSort.Newest -> list // the library comes newest first
@@ -290,6 +292,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Shows the cached library at once, then asks the server what changed. */
     fun openTrunk() {
+        refreshContent()
         viewModelScope.launch {
             trunkAll = TrunkLibrary.cached(getApplication()).map { it.toImage() }
             trunkAlbums = TrunkLibrary.cachedAlbums(getApplication())
@@ -607,6 +610,77 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     fun notSimilar(g: SimilarGroup) = trunkCall {
         TrunkClient.similarIgnore(g.ids)
         similar = similar?.filter { it !== g }
+    }
+
+    // --- content search ---
+
+    /** Where content search stands on this phone. */
+    sealed interface Content {
+        data object Off : Content // trunk has no model (no trunk-ai run yet, or an older trunk)
+        data class Available(val offer: io.github.carnager.peek.trunk.ContentSearch.Offer) : Content
+        data class Downloading(val offer: io.github.carnager.peek.trunk.ContentSearch.Offer, val done: Long) : Content
+        data class Ready(val offer: io.github.carnager.peek.trunk.ContentSearch.Offer) : Content
+    }
+
+    var content by mutableStateOf<Content>(Content.Off)
+        private set
+    /** Photos found by what is in them for the current search: trunk id → score. */
+    var contentHits by mutableStateOf<Map<Long, Float>>(emptyMap())
+        private set
+
+    fun refreshContent() {
+        viewModelScope.launch {
+            if (content is Content.Downloading) return@launch
+            val o = io.github.carnager.peek.trunk.ContentSearch.offer()
+            content = when {
+                o == null -> Content.Off
+                io.github.carnager.peek.trunk.ContentSearch.ready(getApplication(), o) -> Content.Ready(o)
+                else -> Content.Available(o)
+            }
+        }
+    }
+
+    fun downloadContentModel() {
+        val o = (content as? Content.Available)?.offer ?: return
+        content = Content.Downloading(o, 0)
+        viewModelScope.launch {
+            try {
+                io.github.carnager.peek.trunk.ContentSearch.download(getApplication(), o) { done, _ ->
+                    viewModelScope.launch { if (content is Content.Downloading) content = Content.Downloading(o, done) }
+                }
+                content = Content.Ready(o)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                content = Content.Available(o)
+                message = Message(str(R.string.gallery_trunk_unreachable_detail, e.message ?: e.javaClass.simpleName))
+            }
+        }
+    }
+
+    fun removeContentModel() {
+        io.github.carnager.peek.trunk.ContentSearch.remove(getApplication())
+        contentHits = emptyMap()
+        refreshContent()
+    }
+
+    init {
+        // Searches by content as the query settles: the text model runs here, trunk compares.
+        viewModelScope.launch {
+            @OptIn(kotlinx.coroutines.FlowPreview::class)
+            androidx.compose.runtime.snapshotFlow { trunkQuery.trim() to (content as? Content.Ready)?.offer?.model }
+                .debounce(400)
+                .collectLatest { (q, model) ->
+                    contentHits = if (q.length < 2 || model == null) emptyMap() else try {
+                        io.github.carnager.peek.trunk.ContentSearch.search(getApplication(), model, q)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        android.util.Log.w("peek-ai", "content search failed", e)
+                        emptyMap()
+                    }
+                }
+        }
     }
 
     /** Corrects date or place of photos on trunk; see [TrunkClient.adjust]. */

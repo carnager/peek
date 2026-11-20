@@ -111,4 +111,8 @@
     </plurals>
     <string name="settings_notify_shared">Shared photos</string>
     <string name="settings_notify_shared_sub">Tell me when someone sends me photos or adds to a shared album; peek looks about once an hour</string>
+    <string name="settings_content">Search by content</string>
+    <string name="settings_content_ready">Model on this phone: %1$d MB. Tap to remove</string>
+    <string name="settings_content_available">trunk offers it; turn it on in the trunk search</string>
+    <string name="settings_content_none">trunk has no model yet; run trunk-ai once</string>
 </resources>

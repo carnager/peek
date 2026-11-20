@@ -31,6 +31,8 @@ android {
         targetSdk = 36
         versionCode = 20
         versionName = "0.19.0"
+        // Phones are arm64; keeps ONNX Runtime's other builds (30–45 MB each) out of the APK.
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     // English by default, German when the phone (or peek's own language setting) says so. The
@@ -49,6 +51,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            ndk { abiFilters += listOf("x86_64") } // the emulator
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -59,6 +64,11 @@ android {
                 signingConfigs.getByName("debug")
             }
         }
+    }
+
+    // Native libraries compressed in the APK (ONNX Runtime: 36 MB → 14 MB), unpacked on install.
+    packaging {
+        jniLibs { useLegacyPackaging = true }
     }
 
     buildFeatures {
@@ -92,6 +102,8 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     // Uploads to trunk keep running when peek is in the background.
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    // Content search: the text model runs on the phone (downloaded from trunk, not in the APK).
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.32.0")
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     // PlayerSurface: video in Compose without a View that would swallow the pager's swipes.
     implementation("androidx.media3:media3-ui-compose:1.11.1")

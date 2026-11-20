@@ -92,6 +92,21 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
                     item { Row(stringResource(R.string.settings_upload_size), limitLabel) { uploadLimit = true } }
                     item { Row(stringResource(R.string.settings_links), stringResource(R.string.settings_links_sub)) { showLinks = true } }
                     item {
+                        // Content search: the model on this phone, to free its space.
+                        LaunchedEffect(Unit) { vm.refreshContent() }
+                        val c = vm.content
+                        val bytes = remember(c) { io.github.carnager.peek.trunk.ContentSearch.downloadedBytes(ctx) }
+                        Row(
+                            stringResource(R.string.settings_content),
+                            when {
+                                c is io.github.carnager.peek.gallery.GalleryViewModel.Content.Ready || bytes > 0 ->
+                                    stringResource(R.string.settings_content_ready, bytes / (1 shl 20))
+                                c is io.github.carnager.peek.gallery.GalleryViewModel.Content.Off -> stringResource(R.string.settings_content_none)
+                                else -> stringResource(R.string.settings_content_available)
+                            },
+                        ) { if (bytes > 0) vm.removeContentModel() }
+                    }
+                    item {
                         var notifyShared by remember { mutableStateOf(io.github.carnager.peek.trunk.SharedNews.enabled(ctx)) }
                         SwitchRow(stringResource(R.string.settings_notify_shared), stringResource(R.string.settings_notify_shared_sub), notifyShared) {
                             notifyShared = it

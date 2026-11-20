@@ -1,5 +1,6 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.EditCalendar
 import io.github.carnager.peek.ui.brandFont
 import androidx.compose.ui.unit.sp
@@ -254,7 +255,7 @@ fun PhotoGridScreen(
     val library = source == Source.Trunk
     var searchOpen by remember { mutableStateOf(library && vm.trunkSearching) }
     var sortMenu by remember { mutableStateOf(false) }
-    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkTrash, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
+    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkTrash, vm.contentHits, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
     val dayHeaders = !isTrash && (!library || vm.trunkSort.byDate)
     val today = stringResource(R.string.gallery_today)
     val yesterday = stringResource(R.string.gallery_yesterday)
@@ -268,6 +269,7 @@ fun PhotoGridScreen(
     var sending by remember { mutableStateOf<List<MediaImage>?>(null) }
     var linking by remember { mutableStateOf<Pair<Long?, List<MediaImage>>?>(null) }
     var adjusting by remember { mutableStateOf<List<MediaImage>?>(null) }
+    var askContentDownload by remember { mutableStateOf(false) }
     var confirmEnd by remember { mutableStateOf(false) }
     var confirmEmpty by remember { mutableStateOf(false) }
     fun closeSearch() {
@@ -460,6 +462,25 @@ fun PhotoGridScreen(
                             label = { Text(stringResource(f.label)) },
                         )
                     }
+                    // Search by what is in the photos: offered once trunk has a model (trunk-ai).
+                    when (val c = vm.content) {
+                        is GalleryViewModel.Content.Available -> AssistChip(
+                            onClick = { askContentDownload = true },
+                            leadingIcon = { Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(18.dp)) },
+                            label = { Text(stringResource(R.string.gallery_content_enable)) },
+                        )
+                        is GalleryViewModel.Content.Downloading -> AssistChip(
+                            onClick = {},
+                            leadingIcon = { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) },
+                            label = { Text(stringResource(R.string.gallery_content_downloading, (c.done * 100 / c.offer.size.coerceAtLeast(1)).toInt())) },
+                        )
+                        is GalleryViewModel.Content.Ready -> FilterChip(
+                            selected = true, onClick = {}, enabled = false,
+                            leadingIcon = { Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(18.dp)) },
+                            label = { Text(stringResource(R.string.gallery_content_on, vm.contentHits.size)) },
+                        )
+                        GalleryViewModel.Content.Off -> {}
+                    }
                 }
             }
             }
@@ -633,6 +654,18 @@ fun PhotoGridScreen(
     if (sharing && trunkAlbum != null) ShareAlbumSheet(vm, trunkAlbum) { sharing = false }
     sending?.let { imgs -> SendSheet(vm, imgs) { sending = null } }
     adjusting?.let { imgs -> AdjustSheet(vm, imgs) { adjusting = null } }
+    if (askContentDownload) {
+        val offer = (vm.content as? GalleryViewModel.Content.Available)?.offer
+        AlertDialog(
+            onDismissRequest = { askContentDownload = false },
+            shape = RoundedCornerShape(28.dp),
+            icon = { Icon(Icons.Rounded.AutoAwesome, null) },
+            title = { Text(stringResource(R.string.gallery_content_title)) },
+            text = { Text(stringResource(R.string.gallery_content_text, (offer?.size ?: 0) / (1 shl 20), offer?.indexed ?: 0)) },
+            confirmButton = { Button(onClick = { askContentDownload = false; vm.downloadContentModel() }) { Text(stringResource(R.string.gallery_content_download)) } },
+            dismissButton = { TextButton(onClick = { askContentDownload = false }) { Text(stringResource(R.string.gallery_cancel)) } },
+        )
+    }
     linking?.let { (albumId, imgs) ->
         LinkSheet(vm, albumId, imgs, if (albumId != null) trunkAlbum?.name ?: stringResource(R.string.gallery_link_default_photos) else stringResource(R.string.gallery_link_default_photos)) {
             linking = null

@@ -111,4 +111,8 @@
     </plurals>
     <string name="settings_notify_shared">Geteilte Bilder</string>
     <string name="settings_notify_shared_sub">Bescheid geben, wenn mir jemand Bilder schickt oder etwas in ein geteiltes Album legt; peek schaut etwa stündlich nach</string>
+    <string name="settings_content">Nach Inhalt suchen</string>
+    <string name="settings_content_ready">Modell auf diesem Handy: %1$d MB. Tippen zum Entfernen</string>
+    <string name="settings_content_available">trunk bietet es an; einschalten in der trunk-Suche</string>
+    <string name="settings_content_none">trunk hat noch kein Modell; einmal trunk-ai laufen lassen</string>
 </resources>
