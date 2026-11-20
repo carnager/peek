@@ -132,7 +132,6 @@
     <string name="gallery_sort_oldest">Oldest first</string>
     <string name="gallery_sort_size">Largest first</string>
     <string name="gallery_tab_folders">Folders</string>
-    <string name="gallery_tab_phone">Phone</string>
     <string name="gallery_today">Today</string>
     <string name="gallery_trash">Trash</string>
     <string name="gallery_trash_info">Photos in the trash are deleted permanently after 30 days.</string>
@@ -292,4 +291,9 @@
         <item quantity="one">%1$d photo taken out</item>
         <item quantity="other">%1$d photos taken out</item>
     </plurals>
+    <string name="gallery_tab_photos">Photos</string>
+    <string name="gallery_filter_only_phone">Only on phone</string>
+    <string name="gallery_only_phone">Only on this phone, not on trunk yet</string>
+    <string name="gallery_upload">Upload</string>
+    <string name="gallery_albums_phone">Albums on this phone</string>
 </resources>

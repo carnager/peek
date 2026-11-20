@@ -103,10 +103,17 @@ enum class TrunkSort(@StringRes val label: Int, val byDate: Boolean) {
 }
 
 /** What the trunk library can be narrowed to. */
-enum class TrunkFilter(@StringRes val label: Int) { Photos(R.string.gallery_filter_photos), Videos(R.string.gallery_filter_videos), Favorites(R.string.gallery_filter_favorites) }
+enum class TrunkFilter(@StringRes val label: Int) {
+    Photos(R.string.gallery_filter_photos), Videos(R.string.gallery_filter_videos), Favorites(R.string.gallery_filter_favorites),
+    /** Photos still only on the phone, not on trunk yet. */
+    OnlyPhone(R.string.gallery_filter_only_phone),
+}
 
-/** The overview's tabs: the phone's photos, the trunk library, the phone's folders. */
-enum class Tab(@StringRes val label: Int) { Phone(R.string.gallery_tab_phone), Trunk(R.string.gallery_tab_trunk), Folders(R.string.gallery_tab_folders) }
+/**
+ * The overview's tabs: all photos (trunk's library, with what is still only on the phone; without
+ * trunk, the phone's), and the phone's folders.
+ */
+enum class Tab(@StringRes val label: Int) { Trunk(R.string.gallery_tab_photos), Folders(R.string.gallery_tab_folders) }
 
 /** Shows photos from the trunk server, so actions go there. */
 val Source?.onTrunk: Boolean
@@ -229,7 +236,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** The overview's tab, remembered across launches. */
-    var tab by mutableStateOf(runCatching { Tab.valueOf(prefs.getString("tab", Tab.Phone.name)!!) }.getOrDefault(Tab.Phone))
+    var tab by mutableStateOf(runCatching { Tab.valueOf(prefs.getString("tab", Tab.Trunk.name)!!) }.getOrDefault(Tab.Trunk))
         private set
 
     fun selectTab(t: Tab) {
@@ -260,18 +267,64 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             trunkPeople.filter { it.name.isNotEmpty() }.forEach { p -> p.assetIds.forEach { id -> m.getOrPut(id) { StringBuilder() }.append(' ').append(p.name.lowercase()) } }
         }
         val f = trunkFilters
+        // Photos still only on the phone, in the same timeline; name and month find them.
+        val local = phoneOnly.filter { img ->
+            (TrunkFilter.Photos !in f || !img.isVideo) && (TrunkFilter.Videos !in f || img.isVideo) &&
+                (TrunkFilter.Favorites !in f || img.isFavorite) &&
+                words.all { w -> w in localSearchText(img) }
+        }
+        if (TrunkFilter.OnlyPhone in f) return sortShown(local)
         val list = trunk.filter { img ->
             val r = img.remote!!
             (TrunkFilter.Photos !in f || !r.isVideo) && (TrunkFilter.Videos !in f || r.isVideo) &&
                 (TrunkFilter.Favorites !in f || r.favorite) &&
                 (words.all { w -> w in r.searchText || albumsOf[r.id]?.contains(w) == true || namesOf[r.id]?.contains(w) == true } || r.id in contentHits)
         }
-        return when (trunkSort) {
-            TrunkSort.Newest -> list // the library comes newest first
-            TrunkSort.Oldest -> list.reversed()
-            TrunkSort.Added -> list.sortedByDescending { it.remote!!.createdAt }
-            TrunkSort.Name -> list.sortedBy { it.name.lowercase() }
-            TrunkSort.Size -> list.sortedByDescending { it.size }
+        return sortShown(if (local.isEmpty()) list else list + local, merged = local.isNotEmpty())
+    }
+
+    private fun sortShown(list: List<MediaImage>, merged: Boolean = true): List<MediaImage> = when (trunkSort) {
+        TrunkSort.Newest -> if (merged) list.sortedByDescending { it.dateTaken } else list // the library comes newest first
+        TrunkSort.Oldest -> list.sortedBy { it.dateTaken }
+        TrunkSort.Added -> list.sortedByDescending { it.remote?.createdAt ?: it.added * 1000 }
+        TrunkSort.Name -> list.sortedBy { it.name.lowercase() }
+        TrunkSort.Size -> list.sortedByDescending { it.size }
+    }
+
+    private fun localSearchText(img: MediaImage): String {
+        val c = java.util.Calendar.getInstance().apply { timeInMillis = img.dateTaken }
+        val month = java.text.SimpleDateFormat("MMMM", java.util.Locale.getDefault()).format(c.time) + " " +
+            java.text.SimpleDateFormat("MMMM", java.util.Locale.ENGLISH).format(c.time)
+        return "${img.name} ${img.bucketName} $month ${c.get(java.util.Calendar.YEAR)} ${if (img.isVideo) "video" else "foto photo"}".lowercase()
+    }
+
+    // --- photos only on the phone ---
+
+    /** The folders whose photos belong in the timeline: the review's, else the camera's. */
+    private val uploadFolders: Set<Long>
+        get() = reviewSettings.buckets.ifEmpty { images.filter { it.bucketName.equals("Camera", true) }.mapTo(HashSet()) { it.bucketId } }
+
+    /** Photos from those folders that trunk does not have yet. */
+    var phoneOnly by mutableStateOf<List<MediaImage>>(emptyList())
+        private set
+    private var phoneOnlyJob: kotlinx.coroutines.Job? = null
+
+    /** Works out [phoneOnly] again, a moment after the phone's or trunk's photos changed. */
+    private fun refreshPhoneOnly() {
+        phoneOnlyJob?.cancel()
+        if (!trunkConnected) {
+            phoneOnly = emptyList()
+            return
+        }
+        phoneOnlyJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(800)
+            val folders = uploadFolders
+            val local = images.filter { it.bucketId in folders }
+            val remote = trunkAll.mapNotNull { it.remote }
+            val missing = runCatching { io.github.carnager.peek.trunk.OnTrunk.missing(getApplication(), local, remote) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; android.util.Log.w("peek-trunk", "phone-only check", it) }
+                .getOrNull() ?: return@launch
+            phoneOnly = local.filter { it.id in missing }
         }
     }
 
@@ -721,6 +774,21 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        // Uploads finished: ask trunk, so the photos show as on trunk instead of only on the phone.
+        viewModelScope.launch {
+            var running = false
+            androidx.work.WorkManager.getInstance(getApplication()).getWorkInfosForUniqueWorkFlow(io.github.carnager.peek.trunk.UploadWorker.WORK)
+                .collect { infos ->
+                    val now = infos.any { !it.state.isFinished }
+                    if (running && !now) syncTrunk()
+                    running = now
+                }
+        }
+        // The phone's or trunk's photos changed: what is only on the phone may have too.
+        viewModelScope.launch {
+            androidx.compose.runtime.snapshotFlow { Triple(images.size to images.firstOrNull()?.id, trunkAll.size, trunkConnected) }
+                .collect { refreshPhoneOnly() }
+        }
         // Searches by content as the query settles: the text model runs here, trunk compares.
         viewModelScope.launch {
             @OptIn(kotlinx.coroutines.FlowPreview::class)
@@ -807,8 +875,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     /** What is on screen: an opened album or folder, else the photos of the tab (Handy: all, trunk: the library). */
     val shown: Source?
         get() = open ?: when (tab) {
-            Tab.Phone -> Source.All
-            Tab.Trunk -> if (trunkConnected) Source.Trunk else null
+            Tab.Trunk -> if (trunkConnected) Source.Trunk else Source.All
             Tab.Folders -> null
         }
 

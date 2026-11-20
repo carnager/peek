@@ -328,14 +328,14 @@ fun ImageViewer(
                             leadingIcon = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null) },
                             onClick = { menu = false; openWith(ctx, current) },
                         )
-                        if (onSend != null && current.owner == null) {
+                        if (onSend != null && current.remote && current.owner == null) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.view_send_to_person)) },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Send, null) },
                                 onClick = { menu = false; onSend(current) },
                             )
                         }
-                        if (onLink != null && current.owner == null) {
+                        if (onLink != null && current.remote && current.owner == null) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.view_create_link)) },
                                 leadingIcon = { Icon(Icons.Rounded.Link, null) },

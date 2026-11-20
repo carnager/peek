@@ -1,5 +1,6 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.fillMaxSize
 import kotlinx.coroutines.launch
@@ -157,15 +158,17 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
             val tabBar: @Composable () -> Unit = { TabBar(vm, tabGrids) }
             when {
                 screen is Source -> PhotoGridScreen(vm, ops, screen)
-                screen == Tab.Phone -> PhotoGridScreen(
-                    vm, ops, Source.All, root = true, grid = tabGrids.getValue(Tab.Phone),
-                    header = { PhoneHeader(vm, ops) }, bottomBar = tabBar,
-                )
+                // One timeline: trunk's library with what is still only on the phone.
                 screen == Tab.Trunk && vm.trunkConnected -> PhotoGridScreen(
                     vm, ops, Source.Trunk, root = true, grid = tabGrids.getValue(Tab.Trunk),
                     header = { TrunkHeader(vm) }, bottomBar = tabBar,
                 )
-                else -> AlbumsScreen(vm, tabGrids, tabBar)
+                // Without trunk, the phone's photos, and the way to trunk.
+                screen == Tab.Trunk -> PhotoGridScreen(
+                    vm, ops, Source.All, root = true, grid = tabGrids.getValue(Tab.Trunk),
+                    header = { PhoneHeader(vm, ops, timeline = true) }, bottomBar = tabBar,
+                )
+                else -> AlbumsScreen(vm, ops, tabGrids, tabBar)
             }
         }
 
@@ -213,7 +216,9 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                             },
                             onShare = if (!vm.shown.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { img ->
-                                    vm.withTrunkOriginals(listOf(img)) { io.github.carnager.peek.viewer.share(ctx, it, img.mimeType) }
+                                    // Only on the phone yet: shared from here.
+                                    if (img.remote == null) io.github.carnager.peek.viewer.share(ctx, listOf(img.uri), img.mimeType)
+                                    else vm.withTrunkOriginals(listOf(img)) { io.github.carnager.peek.viewer.share(ctx, it, img.mimeType) }
                                 }
                             },
                             onDelete = { item ->
@@ -348,8 +353,7 @@ private fun TabBar(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>) {
                     BadgedBox(badge = { if (n > 0) Badge { Text(if (n > 99) "99+" else "$n") } }) {
                         Icon(
                             when (t) {
-                                Tab.Phone -> Icons.Rounded.Smartphone
-                                Tab.Trunk -> Icons.Rounded.Cloud
+                                Tab.Trunk -> Icons.Rounded.PhotoLibrary
                                 Tab.Folders -> Icons.Rounded.Folder
                             },
                             null,
@@ -380,15 +384,14 @@ internal fun RootActions(vm: GalleryViewModel) {
 /** Tabs that are not a photo grid: the folders, and trunk while it is not connected. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AlbumsScreen(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>, tabBar: @Composable () -> Unit) {
+private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, LazyGridState>, tabBar: @Composable () -> Unit) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    var connecting by remember { mutableStateOf(false) }
     val t = vm.tab
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text(if (t == Tab.Trunk) "trunk" else "peek", fontFamily = brandFont(), fontSize = if (scroll.state.collapsedFraction < 0.5f) 40.sp else 24.sp) },
+                title = { Text("peek", fontFamily = brandFont(), fontSize = if (scroll.state.collapsedFraction < 0.5f) 40.sp else 24.sp) },
                 actions = { RootActions(vm) },
                 scrollBehavior = scroll,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
@@ -407,22 +410,30 @@ private fun AlbumsScreen(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>, t
             verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            if (t == Tab.Trunk) {
-                item(key = "trunk", span = ::full) { TrunkCard(vm, null) { connecting = true } }
-                item(key = "trunkIntro", span = ::full) {
-                    Hint(stringResource(R.string.gallery_trunk_intro))
-                }
-            } else {
-                if (vm.folders.isEmpty()) {
-                    item(key = "foldersEmpty", span = ::full) { Hint(stringResource(R.string.gallery_folders_empty)) }
-                }
-                items(vm.folders, key = { "f:" + it.bucketId }) { a ->
-                    AlbumCard(a.name, a.count, a.cover, Modifier.animateItem()) { vm.open = Source.Folder(a.bucketId) }
-                }
+            // The phone's own: favourites, trash (to undo), peek's albums. Without trunk, the
+            // photos tab shows them already.
+            if (vm.trunkConnected) {
+                item(key = "phone", span = ::full) { Box(Modifier.layout { m, c ->
+                    // The header's strips run edge to edge, past the grid's padding.
+                    val pad = 16.dp.roundToPx()
+                    val p = m.measure(c.copy(maxWidth = c.maxWidth + 2 * pad, minWidth = c.minWidth + 2 * pad))
+                    layout(c.maxWidth, p.height) { p.place(-pad, 0) }
+                }) { PhoneHeader(vm, ops, timeline = false) } }
+                item(key = "foldersTitle", span = ::full) { SectionTitle(stringResource(R.string.gallery_tab_folders)) }
+            }
+            if (vm.folders.isEmpty()) {
+                item(key = "foldersEmpty", span = ::full) { Hint(stringResource(R.string.gallery_folders_empty)) }
+            }
+            items(vm.folders, key = { "f:" + it.bucketId }) { a ->
+                AlbumCard(a.name, a.count, a.cover, Modifier.animateItem()) { vm.open = Source.Folder(a.bucketId) }
             }
         }
     }
-    if (connecting) TrunkConnectDialog(vm, onDone = { connecting = false })
+}
+
+@Composable
+private fun SectionTitle(title: String) {
+    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
 }
 
 /** A grid item across the whole row. */
@@ -434,10 +445,16 @@ private fun countLabel(n: Int) = when (n) {
     else -> pluralStringResource(R.plurals.gallery_photo_count, n, n)
 }
 
-/** Above the phone's photos: highlights, then peek's albums. */
+/**
+ * The phone's own: highlights (memories, favourites, trash) and peek's albums. Above the phone's
+ * photos when trunk is not connected ([timeline]: with the way to trunk and the memories), else
+ * at the top of the folders.
+ */
 @Composable
-private fun PhoneHeader(vm: GalleryViewModel, ops: MediaOps) {
+private fun PhoneHeader(vm: GalleryViewModel, ops: MediaOps, timeline: Boolean) {
     var creating by remember { mutableStateOf(false) }
+    var connecting by remember { mutableStateOf(false) }
+    if (connecting) TrunkConnectDialog(vm, onDone = { connecting = false })
     // Re-checked when coming back, so returning from the settings page updates it.
     var canManage by remember { mutableStateOf(ops.canManageMedia) }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
@@ -445,13 +462,16 @@ private fun PhoneHeader(vm: GalleryViewModel, ops: MediaOps) {
         onPauseOrDispose {}
     }
     Column(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+        if (timeline) {
+            Box(Modifier.padding(horizontal = 13.dp, vertical = 6.dp)) { TrunkCard(vm, null) { connecting = true } }
+        }
         if (!canManage && !vm.manageMediaHintDismissed && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
             Box(Modifier.padding(horizontal = 13.dp, vertical = 6.dp)) {
                 ManageMediaHint(onAllow = ops::requestManageMedia, onDismiss = vm::dismissManageMediaHint)
             }
         }
         Strip {
-            vm.phoneMemories?.let { m ->
+            if (timeline) vm.phoneMemories?.let { m ->
                 item(key = "memories") { MemoriesTile(m) { vm.open = Source.Memories(false) } }
             }
             item(key = "fav") {
@@ -461,7 +481,7 @@ private fun PhoneHeader(vm: GalleryViewModel, ops: MediaOps) {
                 StripCard(stringResource(R.string.gallery_trash), countLabel(vm.trash.size), null, Icons.Rounded.DeleteOutline, MaterialTheme.colorScheme.onSurfaceVariant) { vm.open = Source.Trash }
             }
         }
-        StripTitle(stringResource(R.string.gallery_albums)) { NewButton { creating = true } }
+        StripTitle(stringResource(if (timeline) R.string.gallery_albums else R.string.gallery_albums_phone)) { NewButton { creating = true } }
         if (vm.userAlbums.isEmpty()) {
             Box(Modifier.padding(horizontal = 13.dp)) { Hint(stringResource(R.string.gallery_albums_hint)) }
         } else {

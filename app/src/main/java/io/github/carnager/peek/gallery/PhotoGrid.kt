@@ -1,5 +1,7 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.PersonOff
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.EditCalendar
@@ -256,7 +258,9 @@ fun PhotoGridScreen(
     val library = source == Source.Trunk
     var searchOpen by remember { mutableStateOf(library && vm.trunkSearching) }
     var sortMenu by remember { mutableStateOf(false) }
-    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkTrash, vm.contentHits, vm.trunkPeople, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
+    // Follows whatever imagesOf reads (it reads state), instead of a list of keys that has to
+    // name every input and kept missing one.
+    val list by remember(source) { derivedStateOf { vm.imagesOf(source) } }
     val dayHeaders = !isTrash && (!library || vm.trunkSort.byDate)
     val today = stringResource(R.string.gallery_today)
     val yesterday = stringResource(R.string.gallery_yesterday)
@@ -571,6 +575,7 @@ fun PhotoGridScreen(
                             selected = c.image.id in vm.selection,
                             columns = vm.columns,
                             showFavorite = !isTrash && source != Source.Favorites,
+                            onlyPhone = isTrunk && c.image.remote == null,
                             daysLeft = if (isTrash) c.image.expires.takeIf { it > 0 }?.let { ((it - System.currentTimeMillis()) / DateUtils.DAY_IN_MILLIS).toInt().coerceAtLeast(0) } else null,
                             modifier = Modifier.animateItem(),
                             hidden = vm.hero?.image?.id == c.image.id,
@@ -610,32 +615,47 @@ fun PhotoGridScreen(
                             PillAction(Icons.Rounded.RestoreFromTrash, stringResource(R.string.gallery_restore)) { vm.trunkRestore(selected) }
                             PillAction(Icons.Rounded.DeleteForever, stringResource(R.string.gallery_delete)) { vm.trunkDeleteForever(selected) }
                         } else if (isTrunk) {
+                            // The trunk timeline also holds photos only on the phone: each kind gets its own actions.
+                            val onTrunk = selected.filter { it.remote != null }
+                            val onPhone = selected.filter { it.remote == null }
                             PillAction(Icons.Rounded.Share, stringResource(R.string.gallery_share)) {
                                 val mime = when {
                                     selected.all { it.isVideo } -> "video/*"
                                     selected.none { it.isVideo } -> "image/*"
                                     else -> "*/*"
                                 }
-                                vm.withTrunkOriginals(selected) { share(ctx, it, mime) }
+                                vm.withTrunkOriginals(onTrunk) { share(ctx, it + onPhone.map { p -> p.uri }, mime) }
                             }
                             val allFav = selected.isNotEmpty() && selected.all { it.isFavorite }
                             PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) stringResource(R.string.gallery_unfavorite) else stringResource(R.string.gallery_favorite)) {
-                                vm.trunkFavorite(selected, !allFav)
+                                if (onTrunk.isNotEmpty()) vm.trunkFavorite(onTrunk, !allFav)
+                                if (onPhone.isNotEmpty()) ops.setFavorite(onPhone, !allFav)
                             }
-                            PillAction(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_album)) { vm.addToAlbum = selected.map { it.id } }
-                            PillAction(Icons.Rounded.EditCalendar, stringResource(R.string.gallery_adjust_short)) { adjusting = selected }
-                            if (person != null) {
-                                PillAction(Icons.Rounded.PersonOff, stringResource(R.string.gallery_person_not)) { vm.notThisPerson(person.id, selected) }
-                            }
-                            PillAction(Icons.AutoMirrored.Rounded.Send, stringResource(R.string.gallery_send)) { sending = selected }
-                            PillAction(Icons.Rounded.Link, stringResource(R.string.gallery_link)) { linking = null to selected }
-                            if (trunkAlbum != null) {
-                                PillAction(Icons.Rounded.RemoveCircleOutline, stringResource(R.string.gallery_remove)) {
-                                    vm.trunkRemoveFrom(trunkAlbum.id, selected.map { it.id })
+                            if (onPhone.isNotEmpty()) {
+                                PillAction(Icons.Rounded.CloudUpload, stringResource(R.string.gallery_upload)) {
+                                    ops.uploadToTrunk(onPhone)
                                     vm.selection = emptySet()
                                 }
                             }
-                            PillAction(Icons.Rounded.DeleteOutline, stringResource(R.string.gallery_delete)) { vm.trunkTrash(selected) }
+                            if (onTrunk.isNotEmpty()) {
+                                PillAction(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_album)) { vm.addToAlbum = onTrunk.map { it.id } }
+                                PillAction(Icons.Rounded.EditCalendar, stringResource(R.string.gallery_adjust_short)) { adjusting = onTrunk }
+                                if (person != null) {
+                                    PillAction(Icons.Rounded.PersonOff, stringResource(R.string.gallery_person_not)) { vm.notThisPerson(person.id, onTrunk) }
+                                }
+                                PillAction(Icons.AutoMirrored.Rounded.Send, stringResource(R.string.gallery_send)) { sending = onTrunk }
+                                PillAction(Icons.Rounded.Link, stringResource(R.string.gallery_link)) { linking = null to onTrunk }
+                                if (trunkAlbum != null) {
+                                    PillAction(Icons.Rounded.RemoveCircleOutline, stringResource(R.string.gallery_remove)) {
+                                        vm.trunkRemoveFrom(trunkAlbum.id, onTrunk.map { it.id })
+                                        vm.selection = emptySet()
+                                    }
+                                }
+                            }
+                            PillAction(Icons.Rounded.DeleteOutline, stringResource(R.string.gallery_delete)) {
+                                if (onTrunk.isNotEmpty()) vm.trunkTrash(onTrunk)
+                                if (onPhone.isNotEmpty()) ops.trash(onPhone)
+                            }
                         } else if (isTrash) {
                             PillAction(Icons.Rounded.RestoreFromTrash, stringResource(R.string.gallery_restore)) { ops.restore(selected) }
                             PillAction(Icons.Rounded.DeleteForever, stringResource(R.string.gallery_delete)) { ops.deleteForever(selected) }
@@ -904,6 +924,8 @@ private fun PhotoCell(
     selected: Boolean,
     columns: Int,
     showFavorite: Boolean,
+    /** In trunk's timeline, but not on trunk yet. */
+    onlyPhone: Boolean = false,
     daysLeft: Int?,
     modifier: Modifier,
     hidden: Boolean,
@@ -941,6 +963,12 @@ private fun PhotoCell(
         }
         if (image.mimeType == "image/gif") {
             Icon(Icons.Rounded.GifBox, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp).size(18.dp))
+        }
+        if (onlyPhone) {
+            Icon(
+                Icons.Rounded.CloudOff, stringResource(R.string.gallery_only_phone), tint = Color.White,
+                modifier = Modifier.align(Alignment.TopEnd).padding(5.dp).size(20.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)).padding(3.dp),
+            )
         }
         if (showFavorite && image.isFavorite) {
             Icon(Icons.Rounded.Favorite, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(5.dp).size(16.dp))
