@@ -1,28 +1,27 @@
 package io.github.carnager.peek.review
 
 import android.Manifest
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import io.github.carnager.peek.MainActivity
 import io.github.carnager.peek.R
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import java.util.concurrent.TimeUnit
 
 /**
  * The nightly review: in the evening peek asks to go through what arrived since the last review,
@@ -105,24 +104,40 @@ object Review {
         ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
     }
 
-    /** A daily check at the chosen time; it only speaks up when there is something to review. */
+    /**
+     * Sets the alarm for the next reminder, or clears it. An exact alarm, so it comes at the
+     * minute chosen even when the phone sleeps; each one sets the next. [replace] is kept for the
+     * callers: setting an alarm always replaces the previous one.
+     */
+    @Suppress("UNUSED_PARAMETER")
     fun schedule(ctx: Context, replace: Boolean = false) {
-        val wm = WorkManager.getInstance(ctx)
+        // Earlier versions used a daily WorkManager job, which Doze could delay by hours.
+        WorkManager.getInstance(ctx).cancelUniqueWork(WORK)
+        val am = ctx.getSystemService(AlarmManager::class.java)
+        val pi = alarmIntent(ctx)
         val s = settings(ctx)
         if (!s.remind) {
-            wm.cancelUniqueWork(WORK)
+            am.cancel(pi)
             return
         }
         val now = LocalDateTime.now()
         var next = LocalDateTime.of(now.toLocalDate(), LocalTime.of(s.hour, s.minute))
         if (!next.isAfter(now)) next = next.plusDays(1)
-        val req = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS)
-            .setInitialDelay(Duration.between(now, next))
-            .build()
-        // Not UPDATE: that keeps the old enqueue time and counts the new delay from there, so a
-        // changed time could fire at once. Re-enqueuing counts it from now.
-        wm.enqueueUniquePeriodicWork(WORK, if (replace) ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE else ExistingPeriodicWorkPolicy.KEEP, req)
+        val at = next.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        if (Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+        } else {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi) // permission revoked: a little late is still fine
+        }
     }
+
+    private fun alarmIntent(ctx: Context): PendingIntent = PendingIntent.getBroadcast(
+        ctx, 0,
+        Intent(ctx, ReminderReceiver::class.java).setAction(ACTION_REMIND),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    internal const val ACTION_REMIND = "io.github.carnager.peek.review.REMIND"
 
     internal fun notify(ctx: Context, count: Int) {
         if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
@@ -144,11 +159,29 @@ object Review {
     }
 }
 
-/** Runs once a day at the chosen time and reminds about new photos, if there are any. */
-class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
-    override suspend fun doWork(): Result {
-        val n = Review.pendingCount(applicationContext)
-        if (n > 0) Review.notify(applicationContext, n)
-        return Result.success()
+/**
+ * The alarm itself: reminds about new photos if there are any and sets tomorrow's alarm. Also
+ * sets the alarm again after a reboot, a change of time or timezone, and an update of peek.
+ */
+class ReminderReceiver : BroadcastReceiver() {
+    override fun onReceive(ctx: Context, intent: Intent) {
+        val app = ctx.applicationContext
+        val done = goAsync()
+        Thread {
+            try {
+                if (intent.action == Review.ACTION_REMIND) {
+                    val n = Review.pendingCount(app)
+                    if (n > 0) Review.notify(app, n)
+                }
+                Review.schedule(app)
+            } finally {
+                done.finish()
+            }
+        }.start()
     }
+}
+
+/** What the reminder was before it became an alarm; left so a job queued by an older version ends quietly. */
+class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+    override suspend fun doWork(): Result = Result.success()
 }
