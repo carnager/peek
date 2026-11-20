@@ -51,7 +51,7 @@ object Uploader {
                 FileInputStream(pfd.fileDescriptor).use { input ->
                     val channel = input.channel
                     TrunkClient.uploadResumable(
-                        item.name, item.taken, sha, length,
+                        ctx, item.name, item.taken, sha, length,
                         read = { offset, buf ->
                             channel.position(offset)
                             var n = 0

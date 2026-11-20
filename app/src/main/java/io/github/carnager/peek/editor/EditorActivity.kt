@@ -13,6 +13,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.IntentCompat
+import io.github.carnager.peek.R
 import io.github.carnager.peek.ui.PeekTheme
 
 class EditorActivity : ComponentActivity() {
@@ -28,7 +29,7 @@ class EditorActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val uri = sourceUri(intent)
         if (uri == null) {
-            Toast.makeText(this, "Kein Bild übergeben", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.edit_no_image_received), Toast.LENGTH_SHORT).show()
             finish()
             return
         }
@@ -43,14 +44,14 @@ class EditorActivity : ComponentActivity() {
                     onSaveCopy = { format, quality ->
                         vm.runBusy {
                             val out = vm.saveCopy(format, quality)
-                            done(out, "Als Kopie gespeichert")
+                            done(out, getString(R.string.edit_saved_as_copy))
                         }
                     },
                     onSaveToTrunk = intent.getLongExtra(EXTRA_TRUNK_ID, 0L).takeIf { it != 0L }?.let { id ->
                         { format, quality ->
                             vm.runBusy {
                                 vm.saveEditToTrunk(format, quality, id)
-                                Toast.makeText(this, "Auf trunk gespeichert, das Original bleibt erhalten", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, getString(R.string.edit_saved_to_trunk), Toast.LENGTH_SHORT).show()
                                 setResult(RESULT_OK)
                                 finish()
                             }
@@ -60,7 +61,7 @@ class EditorActivity : ComponentActivity() {
                         { format, quality ->
                             vm.runBusy {
                                 vm.uploadToTrunk(format, quality, intent.getStringExtra(EXTRA_TRUNK_NAME) ?: "bild.jpg", intent.getLongExtra(EXTRA_TRUNK_TAKEN, 0L))
-                                Toast.makeText(this, "Als Kopie zu trunk hochgeladen", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, getString(R.string.edit_uploaded_copy_to_trunk), Toast.LENGTH_SHORT).show()
                                 setResult(RESULT_OK)
                                 finish()
                             }
@@ -88,9 +89,9 @@ class EditorActivity : ComponentActivity() {
             try {
                 vm.overwrite(quality)
             } catch (e: SecurityException) {
-                throw IllegalStateException("Keine Schreibberechtigung für das Original. Bitte als Kopie speichern.")
+                throw IllegalStateException(getString(R.string.edit_no_write_permission))
             }
-            done(vm.source!!.uri, "Original ersetzt")
+            done(vm.source!!.uri, getString(R.string.edit_original_replaced))
         }
     }
 

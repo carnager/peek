@@ -61,6 +61,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
@@ -69,6 +71,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import io.github.carnager.peek.R
 import io.github.carnager.peek.ui.bounceClick
 import io.github.carnager.peek.viewer.share
 import kotlinx.coroutines.CoroutineScope
@@ -88,24 +91,24 @@ private sealed interface Cell {
     data class Photo(val index: Int, val image: MediaImage) : Cell
 }
 
-private fun dayLabel(ms: Long, now: Calendar): String {
+private fun dayLabel(ms: Long, now: Calendar, today: String, yesterday: String): String {
     val c = Calendar.getInstance().apply { timeInMillis = ms }
     return when {
-        DateUtils.isToday(ms) -> "Heute"
-        DateUtils.isToday(ms + DateUtils.DAY_IN_MILLIS) -> "Gestern"
+        DateUtils.isToday(ms) -> today
+        DateUtils.isToday(ms + DateUtils.DAY_IN_MILLIS) -> yesterday
         now.timeInMillis - ms < 6 * DateUtils.DAY_IN_MILLIS -> SimpleDateFormat("EEEE", Locale.getDefault()).format(c.time)
         c.get(Calendar.YEAR) == now.get(Calendar.YEAR) -> SimpleDateFormat("EEE, d. MMMM", Locale.getDefault()).format(c.time)
         else -> SimpleDateFormat("d. MMMM yyyy", Locale.getDefault()).format(c.time)
     }
 }
 
-private fun cellsOf(list: List<MediaImage>, headers: Boolean): List<Cell> {
+private fun cellsOf(list: List<MediaImage>, headers: Boolean, today: String, yesterday: String): List<Cell> {
     if (!headers) return list.mapIndexed { i, img -> Cell.Photo(i, img) }
     val now = Calendar.getInstance()
     val out = ArrayList<Cell>(list.size + 32)
     var last: String? = null
     list.forEachIndexed { i, img ->
-        val label = dayLabel(img.dateTaken, now)
+        val label = dayLabel(img.dateTaken, now, today, yesterday)
         if (label != last) {
             out += Cell.Header(label)
             last = label
@@ -250,7 +253,9 @@ fun PhotoGridScreen(
     var sortMenu by remember { mutableStateOf(false) }
     val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
     val dayHeaders = !isTrash && (!library || vm.trunkSort.byDate)
-    val cells = remember(list, dayHeaders) { cellsOf(list, headers = dayHeaders) }
+    val today = stringResource(R.string.gallery_today)
+    val yesterday = stringResource(R.string.gallery_yesterday)
+    val cells = remember(list, dayHeaders, today, yesterday) { cellsOf(list, headers = dayHeaders, today = today, yesterday = yesterday) }
     val latestCells by rememberUpdatedState(cells)
     val selecting = vm.selection.isNotEmpty()
     val selected = remember(list, vm.selection) { list.filter { it.id in vm.selection } }
@@ -303,15 +308,15 @@ fun PhotoGridScreen(
             LargeTopAppBar(
                 navigationIcon = {
                     if (selecting) {
-                        IconButton(onClick = { vm.selection = emptySet() }) { Icon(Icons.Rounded.Close, "Auswahl beenden") }
+                        IconButton(onClick = { vm.selection = emptySet() }) { Icon(Icons.Rounded.Close, stringResource(R.string.gallery_selection_end)) }
                     } else if (!root) {
-                        IconButton(onClick = { vm.open = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Zurück") }
+                        IconButton(onClick = { vm.open = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.gallery_back)) }
                     }
                 },
                 title = {
                     AnimatedContent(selecting, label = "title") { sel ->
                         if (sel) {
-                            Text("${vm.selection.size} ausgewählt")
+                            Text(stringResource(R.string.gallery_selected, vm.selection.size))
                         } else if (searchOpen) {
                             SearchField(vm.trunkQuery, onChange = { vm.trunkQuery = it }, count = list.size)
                         } else if (root) {
@@ -323,20 +328,20 @@ fun PhotoGridScreen(
                 },
                 actions = {
                     if (selecting) {
-                        IconButton(onClick = { vm.selection = list.mapTo(HashSet()) { it.id } }) { Icon(Icons.Rounded.SelectAll, "Alle auswählen") }
+                        IconButton(onClick = { vm.selection = list.mapTo(HashSet()) { it.id } }) { Icon(Icons.Rounded.SelectAll, stringResource(R.string.gallery_select_all)) }
                     } else if (isTrunk) {
                         if (library) {
                             if (searchOpen) {
-                                IconButton(onClick = ::closeSearch) { Icon(Icons.Rounded.Close, "Suche schließen") }
+                                IconButton(onClick = ::closeSearch) { Icon(Icons.Rounded.Close, stringResource(R.string.gallery_search_close)) }
                             } else {
-                                IconButton(onClick = { searchOpen = true }) { Icon(Icons.Rounded.Search, "Suchen") }
+                                IconButton(onClick = { searchOpen = true }) { Icon(Icons.Rounded.Search, stringResource(R.string.gallery_search)) }
                             }
                             Box {
-                                IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Rounded.Sort, "Sortieren") }
+                                IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Rounded.Sort, stringResource(R.string.gallery_sort)) }
                                 DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }, shape = RoundedCornerShape(20.dp)) {
                                     TrunkSort.entries.forEach { s ->
                                         DropdownMenuItem(
-                                            text = { Text(s.label) },
+                                            text = { Text(stringResource(s.label)) },
                                             leadingIcon = { RadioButton(selected = vm.trunkSort == s, onClick = null) },
                                             onClick = { sortMenu = false; vm.trunkSort = s },
                                         )
@@ -349,51 +354,51 @@ fun PhotoGridScreen(
                         } else if (vm.trunkSyncing) {
                             CircularProgressIndicator(Modifier.padding(12.dp).size(22.dp), strokeWidth = 2.5.dp)
                         } else {
-                            IconButton(onClick = vm::syncTrunk) { Icon(Icons.Rounded.Refresh, "Aktualisieren") }
+                            IconButton(onClick = vm::syncTrunk) { Icon(Icons.Rounded.Refresh, stringResource(R.string.gallery_refresh)) }
                         }
                         if (trunkAlbum != null) Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Mehr") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.gallery_more)) }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
                                 if (trunkAlbum.direct) {
                                     if (trunkAlbum.isOwner) DropdownMenuItem(
-                                        text = { Text("Teilen beenden") },
+                                        text = { Text(stringResource(R.string.gallery_end_sharing)) },
                                         leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
                                         onClick = { menu = false; confirmEnd = true },
                                     ) else DropdownMenuItem(
-                                        text = { Text("Ausblenden") },
+                                        text = { Text(stringResource(R.string.gallery_hide)) },
                                         leadingIcon = { Icon(Icons.Rounded.VisibilityOff, null) },
                                         onClick = { menu = false; vm.trunkLeave(trunkAlbum.id) },
                                     )
                                 } else if (trunkAlbum.isOwner) {
                                     DropdownMenuItem(
-                                        text = { Text("Link teilen") },
+                                        text = { Text(stringResource(R.string.gallery_share_link)) },
                                         leadingIcon = { Icon(Icons.Rounded.Link, null) },
                                         onClick = { menu = false; linking = trunkAlbum.id to emptyList() },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text(if (trunkAlbum.members.isEmpty()) "Teilen" else "Geteilt mit ${trunkAlbum.members.size}") },
+                                        text = { Text(if (trunkAlbum.members.isEmpty()) stringResource(R.string.gallery_share) else stringResource(R.string.gallery_shared_with, trunkAlbum.members.size)) },
                                         leadingIcon = { Icon(Icons.Rounded.Group, null) },
                                         onClick = { menu = false; sharing = true },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Umbenennen") },
+                                        text = { Text(stringResource(R.string.gallery_rename)) },
                                         leadingIcon = { Icon(Icons.Rounded.Edit, null) },
                                         onClick = { menu = false; renaming = true },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Album löschen") },
+                                        text = { Text(stringResource(R.string.gallery_delete_album)) },
                                         leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
                                         onClick = { menu = false; vm.trunkDeleteAlbum(trunkAlbum.id) },
                                     )
                                 } else {
                                     DropdownMenuItem(
-                                        text = { Text("Geteilt von ${trunkAlbum.owner}") },
+                                        text = { Text(stringResource(R.string.gallery_shared_by, trunkAlbum.owner.toString())) },
                                         leadingIcon = { Icon(Icons.Rounded.Group, null) },
                                         onClick = { menu = false },
                                         enabled = false,
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Album verlassen") },
+                                        text = { Text(stringResource(R.string.gallery_leave_album)) },
                                         leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Logout, null) },
                                         onClick = { menu = false; vm.trunkLeave(trunkAlbum.id) },
                                     )
@@ -401,18 +406,18 @@ fun PhotoGridScreen(
                             }
                         }
                     } else if (isTrash && list.isNotEmpty()) {
-                        TextButton(onClick = { confirmEmpty = true }) { Text("Leeren") }
+                        TextButton(onClick = { confirmEmpty = true }) { Text(stringResource(R.string.gallery_empty_trash)) }
                     } else if (userAlbum != null) {
                         Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Mehr") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.gallery_more)) }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
                                 DropdownMenuItem(
-                                    text = { Text("Umbenennen") },
+                                    text = { Text(stringResource(R.string.gallery_rename)) },
                                     leadingIcon = { Icon(Icons.Rounded.Edit, null) },
                                     onClick = { menu = false; renaming = true },
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Album löschen") },
+                                    text = { Text(stringResource(R.string.gallery_delete_album)) },
                                     leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
                                     onClick = { menu = false; vm.deleteAlbum(userAlbum.id) },
                                 )
@@ -445,7 +450,7 @@ fun PhotoGridScreen(
                                     else -> vm.trunkFilters + f
                                 }
                             },
-                            label = { Text(f.label) },
+                            label = { Text(stringResource(f.label)) },
                         )
                     }
                 }
@@ -456,7 +461,7 @@ fun PhotoGridScreen(
         Box(Modifier.fillMaxSize()) {
             if (library && vm.trunkSearching && list.isEmpty()) {
                 Text(
-                    "Nichts gefunden",
+                    stringResource(R.string.gallery_nothing_found),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.Center),
@@ -484,7 +489,7 @@ fun PhotoGridScreen(
                 if (isTrash && list.isNotEmpty()) {
                     item(key = "trashInfo", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
-                            "Bilder im Papierkorb werden nach 30 Tagen endgültig gelöscht.",
+                            stringResource(R.string.gallery_trash_info),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
@@ -546,7 +551,7 @@ fun PhotoGridScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (isTrunk) {
-                            PillAction(Icons.Rounded.Share, "Teilen") {
+                            PillAction(Icons.Rounded.Share, stringResource(R.string.gallery_share)) {
                                 val mime = when {
                                     selected.all { it.isVideo } -> "video/*"
                                     selected.none { it.isVideo } -> "image/*"
@@ -555,25 +560,25 @@ fun PhotoGridScreen(
                                 vm.withTrunkOriginals(selected) { share(ctx, it, mime) }
                             }
                             val allFav = selected.isNotEmpty() && selected.all { it.isFavorite }
-                            PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) "Kein Fav." else "Favorit") {
+                            PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) stringResource(R.string.gallery_unfavorite) else stringResource(R.string.gallery_favorite)) {
                                 vm.trunkFavorite(selected, !allFav)
                             }
-                            PillAction(Icons.Rounded.PhotoAlbum, "Album") { vm.addToAlbum = selected.map { it.id } }
-                            PillAction(Icons.AutoMirrored.Rounded.Send, "Senden") { sending = selected }
-                            PillAction(Icons.Rounded.Link, "Link") { linking = null to selected }
+                            PillAction(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_album)) { vm.addToAlbum = selected.map { it.id } }
+                            PillAction(Icons.AutoMirrored.Rounded.Send, stringResource(R.string.gallery_send)) { sending = selected }
+                            PillAction(Icons.Rounded.Link, stringResource(R.string.gallery_link)) { linking = null to selected }
                             if (trunkAlbum != null) {
-                                PillAction(Icons.Rounded.RemoveCircleOutline, "Entfernen") {
+                                PillAction(Icons.Rounded.RemoveCircleOutline, stringResource(R.string.gallery_remove)) {
                                     vm.trunkRemoveFrom(trunkAlbum.id, selected.map { it.id })
                                     vm.selection = emptySet()
                                 }
                             }
-                            PillAction(Icons.Rounded.DeleteOutline, "Löschen") { vm.trunkTrash(selected) }
+                            PillAction(Icons.Rounded.DeleteOutline, stringResource(R.string.gallery_delete)) { vm.trunkTrash(selected) }
                         } else if (isTrash) {
-                            PillAction(Icons.Rounded.RestoreFromTrash, "Wiederherstellen") { ops.restore(selected) }
-                            PillAction(Icons.Rounded.DeleteForever, "Löschen") { ops.deleteForever(selected) }
+                            PillAction(Icons.Rounded.RestoreFromTrash, stringResource(R.string.gallery_restore)) { ops.restore(selected) }
+                            PillAction(Icons.Rounded.DeleteForever, stringResource(R.string.gallery_delete)) { ops.deleteForever(selected) }
                         } else {
                             val allFav = selected.isNotEmpty() && selected.all { it.isFavorite }
-                            PillAction(Icons.Rounded.Share, "Teilen") {
+                            PillAction(Icons.Rounded.Share, stringResource(R.string.gallery_share)) {
                                 val mime = when {
                                     selected.all { it.isVideo } -> "video/*"
                                     selected.none { it.isVideo } -> "image/*"
@@ -581,10 +586,10 @@ fun PhotoGridScreen(
                                 }
                                 share(ctx, selected.map { it.uri }, mime)
                             }
-                            PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) "Kein Fav." else "Favorit") {
+                            PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) stringResource(R.string.gallery_unfavorite) else stringResource(R.string.gallery_favorite)) {
                                 ops.setFavorite(selected, !allFav)
                             }
-                            PillAction(Icons.Rounded.PhotoAlbum, "Album") { vm.addToAlbum = selected.map { it.id } }
+                            PillAction(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_album)) { vm.addToAlbum = selected.map { it.id } }
                             if (vm.trunkConnected) {
                                 PillAction(Icons.Rounded.CloudUpload, "trunk") {
                                     ops.uploadToTrunk(selected)
@@ -592,12 +597,12 @@ fun PhotoGridScreen(
                                 }
                             }
                             if (userAlbum != null) {
-                                PillAction(Icons.Rounded.RemoveCircleOutline, "Entfernen") {
+                                PillAction(Icons.Rounded.RemoveCircleOutline, stringResource(R.string.gallery_remove)) {
                                     vm.removeFrom(userAlbum.id, selected.map { it.id })
                                     vm.selection = emptySet()
                                 }
                             }
-                            PillAction(Icons.Rounded.DeleteOutline, "Löschen") { ops.trash(selected) }
+                            PillAction(Icons.Rounded.DeleteOutline, stringResource(R.string.gallery_delete)) { ops.trash(selected) }
                         }
                     }
                 }
@@ -606,7 +611,7 @@ fun PhotoGridScreen(
     }
 
     if (renaming && userAlbum != null) {
-        NameDialog("Album umbenennen", userAlbum.name, "Speichern", onDismiss = { renaming = false }) {
+        NameDialog(stringResource(R.string.gallery_rename_album), userAlbum.name, stringResource(R.string.gallery_save), onDismiss = { renaming = false }) {
             vm.renameAlbum(userAlbum.id, it)
             renaming = false
         }
@@ -614,7 +619,7 @@ fun PhotoGridScreen(
     if (sharing && trunkAlbum != null) ShareAlbumSheet(vm, trunkAlbum) { sharing = false }
     sending?.let { imgs -> SendSheet(vm, imgs) { sending = null } }
     linking?.let { (albumId, imgs) ->
-        LinkSheet(vm, albumId, imgs, if (albumId != null) trunkAlbum?.name ?: "Fotos" else "Fotos") {
+        LinkSheet(vm, albumId, imgs, if (albumId != null) trunkAlbum?.name ?: stringResource(R.string.gallery_link_default_photos) else stringResource(R.string.gallery_link_default_photos)) {
             linking = null
             vm.selection = emptySet()
         }
@@ -623,14 +628,14 @@ fun PhotoGridScreen(
         AlertDialog(
             onDismissRequest = { confirmEnd = false },
             shape = RoundedCornerShape(28.dp),
-            title = { Text("Teilen mit ${trunkAlbum.name} beenden?") },
-            text = { Text("${trunkAlbum.name} sieht diese Bilder dann nicht mehr. Bei dir bleiben sie.") },
-            confirmButton = { TextButton(onClick = { confirmEnd = false; vm.trunkEndDirect(trunkAlbum.id) }) { Text("Beenden") } },
-            dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text("Abbrechen") } },
+            title = { Text(stringResource(R.string.gallery_end_sharing_title, trunkAlbum.name)) },
+            text = { Text(stringResource(R.string.gallery_end_sharing_text, trunkAlbum.name)) },
+            confirmButton = { TextButton(onClick = { confirmEnd = false; vm.trunkEndDirect(trunkAlbum.id) }) { Text(stringResource(R.string.gallery_end)) } },
+            dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text(stringResource(R.string.gallery_cancel)) } },
         )
     }
     if (renaming && trunkAlbum != null) {
-        NameDialog("Album umbenennen", trunkAlbum.name, "Speichern", onDismiss = { renaming = false }) {
+        NameDialog(stringResource(R.string.gallery_rename_album), trunkAlbum.name, stringResource(R.string.gallery_save), onDismiss = { renaming = false }) {
             vm.trunkRenameAlbum(trunkAlbum.id, it)
             renaming = false
         }
@@ -639,15 +644,15 @@ fun PhotoGridScreen(
         AlertDialog(
             onDismissRequest = { confirmEmpty = false },
             shape = RoundedCornerShape(28.dp),
-            title = { Text("Papierkorb leeren?") },
-            text = { Text("${list.size} Bilder werden endgültig gelöscht.") },
+            title = { Text(stringResource(R.string.gallery_empty_trash_title)) },
+            text = { Text(pluralStringResource(R.plurals.gallery_empty_trash_text, list.size, list.size)) },
             confirmButton = {
                 Button(
                     onClick = { confirmEmpty = false; ops.deleteForever(list) },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text("Endgültig löschen") }
+                ) { Text(stringResource(R.string.gallery_delete_forever)) }
             },
-            dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text("Abbrechen") } },
+            dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text(stringResource(R.string.gallery_cancel)) } },
         )
     }
 }
@@ -668,14 +673,14 @@ private fun SearchField(query: String, onChange: (String) -> Unit, count: Int) {
             decorationBox = { inner ->
                 Box {
                     if (query.isEmpty()) {
-                        Text("Ort, Jahr, Monat, Beschreibung …", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.gallery_search_hint), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     inner()
                 }
             },
         )
         if (query.isNotBlank()) {
-            Text(if (count == 1) "1 Treffer" else "$count Treffer", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(pluralStringResource(R.plurals.gallery_search_hits, count, count), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -683,12 +688,12 @@ private fun SearchField(query: String, onChange: (String) -> Unit, count: Int) {
 @Composable
 private fun EmptyState(source: Source, modifier: Modifier) {
     val (icon, title, text) = when (source) {
-        Source.Favorites -> Triple(Icons.Rounded.FavoriteBorder, "Noch keine Favoriten", "Tippe im Viewer aufs Herz, um ein Bild hier zu sammeln.")
-        Source.Trash -> Triple(Icons.Rounded.DeleteOutline, "Papierkorb ist leer", "Gelöschte Bilder landen hier und bleiben 30 Tage wiederherstellbar.")
-        is Source.User -> Triple(Icons.Rounded.PhotoAlbum, "Album ist leer", "Wähle Bilder in einem Ordner aus und tippe auf „Album“.")
-        is Source.TrunkAlbum -> Triple(Icons.Rounded.PhotoAlbum, "Album ist leer", "Wähle Bilder in trunk aus und tippe auf „Album“.")
-        is Source.Memories -> Triple(Icons.Rounded.History, "Heute kein Rückblick", "An diesem Tag gibt es keine Bilder aus früheren Jahren.")
-        else -> Triple(Icons.Rounded.PhotoLibrary, "Keine Bilder", "")
+        Source.Favorites -> Triple(Icons.Rounded.FavoriteBorder, stringResource(R.string.gallery_empty_favorites_title), stringResource(R.string.gallery_empty_favorites_text))
+        Source.Trash -> Triple(Icons.Rounded.DeleteOutline, stringResource(R.string.gallery_empty_trash_state_title), stringResource(R.string.gallery_empty_trash_state_text))
+        is Source.User -> Triple(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_empty_album_title), stringResource(R.string.gallery_empty_album_text))
+        is Source.TrunkAlbum -> Triple(Icons.Rounded.PhotoAlbum, stringResource(R.string.gallery_empty_album_title), stringResource(R.string.gallery_empty_trunk_album_text))
+        is Source.Memories -> Triple(Icons.Rounded.History, stringResource(R.string.gallery_empty_memories_title), stringResource(R.string.gallery_empty_memories_text))
+        else -> Triple(Icons.Rounded.PhotoLibrary, stringResource(R.string.gallery_no_photos), "")
     }
     Column(
         modifier.fillMaxSize().padding(40.dp),
@@ -852,7 +857,7 @@ private fun PhotoCell(
         }
         if (daysLeft != null) {
             Text(
-                if (daysLeft == 1) "1 Tag" else "$daysLeft Tage",
+                pluralStringResource(R.plurals.gallery_days, daysLeft, daysLeft),
                 color = Color.White,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 6.dp, vertical = 1.dp),

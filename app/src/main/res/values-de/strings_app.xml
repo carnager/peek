@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MainActivity -->
+    <plurals name="app_upload_started">
+        <item quantity="one">%d Datei wird zu trunk hochgeladen</item>
+        <item quantity="other">%d Dateien werden zu trunk hochgeladen</item>
+    </plurals>
+    <plurals name="app_trashed">
+        <item quantity="one">%d Bild im Papierkorb</item>
+        <item quantity="other">%d Bilder im Papierkorb</item>
+    </plurals>
+    <plurals name="app_restored">
+        <item quantity="one">%d Bild wiederhergestellt</item>
+        <item quantity="other">%d Bilder wiederhergestellt</item>
+    </plurals>
+    <plurals name="app_deleted_forever">
+        <item quantity="one">%d Bild endgültig gelöscht</item>
+        <item quantity="other">%d Bilder endgültig gelöscht</item>
+    </plurals>
+    <string name="app_undo">Rückgängig</string>
+    <string name="app_permission_text">peek braucht Zugriff auf deine Bilder, um sie anzuzeigen.</string>
+    <string name="app_permission_allow">Zugriff erlauben</string>
+
+    <!-- Settings -->
+    <string name="settings_back">Zurück</string>
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_review_section">Neue Bilder durchsehen</string>
+    <string name="settings_remind">Abends erinnern</string>
+    <string name="settings_remind_sub">Nur wenn es Neues gibt</string>
+    <string name="settings_remind_no_notifications">Ohne Benachrichtigungen kann peek nicht erinnern.</string>
+    <string name="settings_time">Uhrzeit</string>
+    <string name="settings_folders">Ordner</string>
+    <string name="settings_folders_none">Keiner gewählt</string>
+    <plurals name="settings_folders_count">
+        <item quantity="one">%d Ordner</item>
+        <item quantity="other">%d Ordner</item>
+    </plurals>
+    <string name="settings_review_now">Jetzt durchsehen</string>
+    <string name="settings_review_now_sub">Behalten, löschen, zu trunk</string>
+    <string name="settings_review_nothing_new">Nichts Neues</string>
+    <plurals name="settings_review_new_count">
+        <item quantity="one">%d neues Bild</item>
+        <item quantity="other">%d neue Bilder</item>
+    </plurals>
+    <string name="settings_server">Server</string>
+    <string name="settings_server_sub">%1$s auf %2$s</string>
+    <string name="settings_upload_size">Upload-Größe</string>
+    <string name="settings_links">Öffentliche Links</string>
+    <string name="settings_links_sub">Ansehen, erneut teilen, zurückziehen</string>
+    <string name="settings_logout">Abmelden</string>
+    <string name="settings_logout_sub">Dieses Gerät von trunk abmelden</string>
+    <string name="settings_connect">Mit trunk verbinden</string>
+    <string name="settings_connect_sub">Fotos sichern und auf allen Geräten sehen</string>
+    <string name="settings_about">Über</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="settings_ok">OK</string>
+    <string name="settings_cancel">Abbrechen</string>
+
+    <!-- Review -->
+    <string name="review_channel">Abendliche Durchsicht</string>
+    <plurals name="review_notify_title">
+        <item quantity="one">%d neues Bild</item>
+        <item quantity="other">%d neue Bilder</item>
+    </plurals>
+    <string name="review_notify_text">Kurz durchsehen: behalten, löschen, zu trunk?</string>
+    <string name="review_done">Durchgesehen</string>
+    <string name="review_done_deleted">%1$d gelöscht</string>
+    <plurals name="review_done_uploading">
+        <item quantity="one">%d geht zu trunk</item>
+        <item quantity="other">%d gehen zu trunk</item>
+    </plurals>
+    <string name="review_later">Später</string>
+    <string name="review_title">Durchsehen</string>
+    <string name="review_step1_of2">Schritt 1 von 2: Was bleibt?</string>
+    <string name="review_step1">Was bleibt?</string>
+    <string name="review_step2_of2">Schritt 2 von 2: Was geht zu trunk?</string>
+    <string name="review_select_none">Keins</string>
+    <string name="review_select_all">Alle</string>
+    <string name="review_tap_hint">Tippe an, was weg soll</string>
+    <string name="review_delete_keep">%1$d löschen · %2$d behalten</string>
+    <string name="review_next">Weiter</string>
+    <string name="review_finish">Fertig</string>
+    <string name="review_upload_nothing">Nichts hochladen</string>
+    <string name="review_upload">Hochladen</string>
+    <string name="review_upload_count">%1$d hochladen</string>
+    <string name="review_marked_delete">Wird gelöscht</string>
+    <string name="review_marked_upload">Geht zu trunk</string>
+
+    <!-- trunk -->
+    <string name="trunk_upload_channel">Upload zu trunk</string>
+    <string name="trunk_uploading">Lade zu trunk hoch</string>
+    <string name="trunk_uploading_progress">Lade zu trunk hoch: %1$d von %2$d</string>
+    <string name="trunk_uploaded_count">%1$d hochgeladen</string>
+    <string name="trunk_skipped_count">%1$d waren schon da</string>
+    <string name="trunk_failed_count">%1$d fehlgeschlagen</string>
+    <string name="trunk_nothing_to_do">Nichts zu tun</string>
+    <string name="trunk_upload_finished">Upload zu trunk fertig</string>
+    <string name="trunk_upload_failed">Upload zu trunk mit Fehlern</string>
+    <string name="trunk_error_original">Original konnte nicht geladen werden (HTTP %1$d)</string>
+    <string name="trunk_error_no_upload_address">Server gab keine Upload-Adresse zurück</string>
+    <string name="trunk_album_from">Von %1$s</string>
+    <string name="trunk_album_to">An %1$s</string>
+</resources>

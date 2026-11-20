@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MainActivity -->
+    <plurals name="app_upload_started">
+        <item quantity="one">Uploading %d file to trunk</item>
+        <item quantity="other">Uploading %d files to trunk</item>
+    </plurals>
+    <plurals name="app_trashed">
+        <item quantity="one">%d photo moved to trash</item>
+        <item quantity="other">%d photos moved to trash</item>
+    </plurals>
+    <plurals name="app_restored">
+        <item quantity="one">%d photo restored</item>
+        <item quantity="other">%d photos restored</item>
+    </plurals>
+    <plurals name="app_deleted_forever">
+        <item quantity="one">%d photo permanently deleted</item>
+        <item quantity="other">%d photos permanently deleted</item>
+    </plurals>
+    <string name="app_undo">Undo</string>
+    <string name="app_permission_text">peek needs access to your photos to show them.</string>
+    <string name="app_permission_allow">Allow access</string>
+
+    <!-- Settings -->
+    <string name="settings_back">Back</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_review_section">Review new photos</string>
+    <string name="settings_remind">Evening reminder</string>
+    <string name="settings_remind_sub">Only when there\'s something new</string>
+    <string name="settings_remind_no_notifications">peek can\'t remind you without notifications.</string>
+    <string name="settings_time">Time</string>
+    <string name="settings_folders">Folders</string>
+    <string name="settings_folders_none">None selected</string>
+    <plurals name="settings_folders_count">
+        <item quantity="one">%d folder</item>
+        <item quantity="other">%d folders</item>
+    </plurals>
+    <string name="settings_review_now">Review now</string>
+    <string name="settings_review_now_sub">Keep, delete, send to trunk</string>
+    <string name="settings_review_nothing_new">Nothing new</string>
+    <plurals name="settings_review_new_count">
+        <item quantity="one">%d new photo</item>
+        <item quantity="other">%d new photos</item>
+    </plurals>
+    <string name="settings_server">Server</string>
+    <string name="settings_server_sub">%1$s on %2$s</string>
+    <string name="settings_upload_size">Upload size</string>
+    <string name="settings_links">Public links</string>
+    <string name="settings_links_sub">View, share again, revoke</string>
+    <string name="settings_logout">Sign out</string>
+    <string name="settings_logout_sub">Sign this device out of trunk</string>
+    <string name="settings_connect">Connect to trunk</string>
+    <string name="settings_connect_sub">Back up your photos and see them on all your devices</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="settings_ok">OK</string>
+    <string name="settings_cancel">Cancel</string>
+
+    <!-- Review -->
+    <string name="review_channel">Evening review</string>
+    <plurals name="review_notify_title">
+        <item quantity="one">%d new photo</item>
+        <item quantity="other">%d new photos</item>
+    </plurals>
+    <string name="review_notify_text">Take a quick look: keep, delete or send to trunk?</string>
+    <string name="review_done">Reviewed</string>
+    <string name="review_done_deleted">%1$d deleted</string>
+    <plurals name="review_done_uploading">
+        <item quantity="one">%d going to trunk</item>
+        <item quantity="other">%d going to trunk</item>
+    </plurals>
+    <string name="review_later">Later</string>
+    <string name="review_title">Review</string>
+    <string name="review_step1_of2">Step 1 of 2: What stays?</string>
+    <string name="review_step1">What stays?</string>
+    <string name="review_step2_of2">Step 2 of 2: What goes to trunk?</string>
+    <string name="review_select_none">None</string>
+    <string name="review_select_all">All</string>
+    <string name="review_tap_hint">Tap what should go</string>
+    <string name="review_delete_keep">Delete %1$d · keep %2$d</string>
+    <string name="review_next">Next</string>
+    <string name="review_finish">Done</string>
+    <string name="review_upload_nothing">Don\'t upload</string>
+    <string name="review_upload">Upload</string>
+    <string name="review_upload_count">Upload %1$d</string>
+    <string name="review_marked_delete">Will be deleted</string>
+    <string name="review_marked_upload">Goes to trunk</string>
+
+    <!-- trunk -->
+    <string name="trunk_upload_channel">Uploads to trunk</string>
+    <string name="trunk_uploading">Uploading to trunk</string>
+    <string name="trunk_uploading_progress">Uploading to trunk: %1$d of %2$d</string>
+    <string name="trunk_uploaded_count">%1$d uploaded</string>
+    <string name="trunk_skipped_count">%1$d already there</string>
+    <string name="trunk_failed_count">%1$d failed</string>
+    <string name="trunk_nothing_to_do">Nothing to do</string>
+    <string name="trunk_upload_finished">Upload to trunk finished</string>
+    <string name="trunk_upload_failed">Upload to trunk finished with errors</string>
+    <string name="trunk_error_original">Couldn\'t load the original (HTTP %1$d)</string>
+    <string name="trunk_error_no_upload_address">The server returned no upload address</string>
+    <string name="trunk_album_from">From %1$s</string>
+    <string name="trunk_album_to">To %1$s</string>
+</resources>

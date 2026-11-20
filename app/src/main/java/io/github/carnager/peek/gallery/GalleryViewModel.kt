@@ -7,8 +7,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.carnager.peek.R
 import io.github.carnager.peek.trunk.RemoteAsset
 import io.github.carnager.peek.trunk.TrunkAccount
 import io.github.carnager.peek.trunk.TrunkClient
@@ -39,17 +41,15 @@ sealed interface Source {
  * week around it. Most recent year first, each day in the order it happened.
  */
 class OnThisDay(val images: List<MediaImage>, val yearsAgo: List<Int>, val wholeWeek: Boolean, val remote: Boolean) {
-    /** "Heute vor 2 Jahren", "Diese Woche vor 1, 3 und 5 Jahren". */
-    val title: String
-        get() {
-            val n = yearsAgo
-            val years = when {
-                n.size == 1 && n[0] == 1 -> "einem Jahr"
-                n.size == 1 -> "${n[0]} Jahren"
-                else -> n.dropLast(1).joinToString(", ") + " und ${n.last()} Jahren"
-            }
-            return (if (wholeWeek) "Diese Woche vor " else "Heute vor ") + years
+    /** "2 years ago today", "1, 3 and 5 years ago this week". */
+    fun title(res: android.content.res.Resources): String {
+        val n = yearsAgo
+        return if (n.size == 1) {
+            res.getQuantityString(if (wholeWeek) R.plurals.gallery_memories_week else R.plurals.gallery_memories_today, n[0], n[0])
+        } else {
+            res.getString(if (wholeWeek) R.string.gallery_memories_week_list else R.string.gallery_memories_today_list, n.dropLast(1).joinToString(", "), n.last())
         }
+    }
 
     /** A favourite if there is one, else a photo from the middle of the most recent year. */
     val cover: MediaImage
@@ -86,19 +86,19 @@ class OnThisDay(val images: List<MediaImage>, val yearsAgo: List<Int>, val whole
 }
 
 /** How the trunk library is ordered. */
-enum class TrunkSort(val label: String, val byDate: Boolean) {
-    Newest("Neueste zuerst", true),
-    Oldest("Älteste zuerst", true),
-    Added("Zuletzt hinzugefügt", false),
-    Name("Name", false),
-    Size("Größte zuerst", false),
+enum class TrunkSort(@StringRes val label: Int, val byDate: Boolean) {
+    Newest(R.string.gallery_sort_newest, true),
+    Oldest(R.string.gallery_sort_oldest, true),
+    Added(R.string.gallery_sort_added, false),
+    Name(R.string.gallery_sort_name, false),
+    Size(R.string.gallery_sort_size, false),
 }
 
 /** What the trunk library can be narrowed to. */
-enum class TrunkFilter(val label: String) { Photos("Fotos"), Videos("Videos"), Favorites("Favoriten") }
+enum class TrunkFilter(@StringRes val label: Int) { Photos(R.string.gallery_filter_photos), Videos(R.string.gallery_filter_videos), Favorites(R.string.gallery_filter_favorites) }
 
 /** The overview's tabs: the phone's photos, the trunk library, the phone's folders. */
-enum class Tab(val label: String) { Phone("Handy"), Trunk("trunk"), Folders("Ordner") }
+enum class Tab(@StringRes val label: Int) { Phone(R.string.gallery_tab_phone), Trunk(R.string.gallery_tab_trunk), Folders(R.string.gallery_tab_folders) }
 
 /** Shows photos from the trunk server, so actions go there. */
 val Source?.onTrunk: Boolean get() = this == Source.Trunk || this is Source.TrunkAlbum || (this is Source.Memories && remote)
@@ -143,6 +143,9 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private val prefs = app.getSharedPreferences("gallery", 0)
+
+    private fun str(@StringRes id: Int, vararg args: Any): String = getApplication<Application>().getString(id, *args)
+    private fun plural(@androidx.annotation.PluralsRes id: Int, n: Int, vararg args: Any): String = getApplication<Application>().resources.getQuantityString(id, n, *args)
 
     /** Thumbnail columns in an album, changed by pinching the grid. */
     var columns by mutableIntStateOf(prefs.getInt("columns", 4))
@@ -297,7 +300,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.w("peek-trunk", "sync failed", e)
-                message = Message("trunk nicht erreichbar: ${e.message ?: e.javaClass.simpleName}")
+                message = Message(str(R.string.gallery_trunk_unreachable_detail, e.message ?: e.javaClass.simpleName))
             } finally {
                 trunkSyncing = false
             }
@@ -316,9 +319,9 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: TrunkException) {
-                done(if (e.status == 401) "Name oder Passwort stimmt nicht" else e.message)
+                done(if (e.status == 401) str(R.string.gallery_login_wrong) else e.message)
             } catch (e: Exception) {
-                done("Server nicht erreichbar: ${e.message ?: e.javaClass.simpleName}")
+                done(str(R.string.gallery_server_unreachable, e.message ?: e.javaClass.simpleName))
             }
         }
     }
@@ -352,7 +355,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val remote = images.mapNotNull { it.remote }
         if (remote.isEmpty()) return@trunkCall
         if (remote.sumOf { it.size } > 2_000_000) {
-            message = Message(if (remote.size == 1) "Lade Original …" else "Lade ${remote.size} Originale …")
+            message = Message(plural(R.plurals.gallery_loading_originals, remote.size, remote.size))
         }
         val uris = remote.map { io.github.carnager.peek.trunk.TrunkFiles.file(getApplication(), it) }
         then(uris)
@@ -383,7 +386,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val (own, foreign) = images.partition { it.remote?.owner == null }
         if (foreign.isNotEmpty()) {
             val who = foreign.mapNotNull { it.remote?.owner }.distinct().joinToString(", ")
-            message = Message(if (own.isEmpty()) "Gehört $who – nur ansehen" else "${foreign.size} von $who übersprungen")
+            message = Message(if (own.isEmpty()) str(R.string.gallery_foreign_view_only, who) else str(R.string.gallery_foreign_skipped, foreign.size, who))
         }
         return own
     }
@@ -407,13 +410,13 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         if (ids.isEmpty()) return@trunkCall
         applyAlbum(TrunkClient.sendTo(userId, ids))
         selection = emptySet()
-        message = Message(if (ids.size == 1) "1 Bild an $name gesendet" else "${ids.size} Bilder an $name gesendet")
+        message = Message(plural(R.plurals.gallery_sent_to, ids.size, ids.size, name))
     }
 
     /** Makes a public link and returns its address; for an album, or for our own photos among [images]. */
     suspend fun trunkCreateLink(albumId: Long?, images: List<MediaImage>, title: String, stripLocation: Boolean, expiresDays: Int): String {
         val ids = if (albumId == null) remoteIds(ownOnly(images).map { it.id }) else null
-        if (albumId == null && ids.isNullOrEmpty()) error("Keine eigenen Bilder ausgewählt")
+        if (albumId == null && ids.isNullOrEmpty()) error(str(R.string.gallery_no_own_selected))
         val o = TrunkClient.createLink(albumId, ids, title, stripLocation, expiresDays)
         return TrunkAccount.linkUrl(o.getString("path"))
     }
@@ -432,13 +435,13 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         TrunkClient.removeMember(albumId, me)
         applyAlbum(null, deletedId = albumId)
         if (open == Source.TrunkAlbum(albumId)) open = null
-        message = Message("„$name“ verlassen")
+        message = Message(str(R.string.gallery_left_album, name))
     }
 
     fun trunkCreateAlbum(name: String, imageIds: List<Long> = emptyList(), then: (Long) -> Unit = {}) = trunkCall {
         val o = TrunkClient.createAlbum(name.trim(), remoteIds(imageIds))
         applyAlbum(o)
-        if (imageIds.isNotEmpty()) message = Message("${imageIds.size} zu „${o.optString("name")}“ hinzugefügt")
+        if (imageIds.isNotEmpty()) message = Message(str(R.string.gallery_added_to, imageIds.size, o.optString("name")))
         then(o.getLong("id"))
     }
 
@@ -447,17 +450,17 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val ids = remoteIds(imageIds)
         val fresh = ids.filter { it !in album.assetIds }
         if (fresh.isEmpty()) {
-            message = Message("Schon in „${album.name}“")
+            message = Message(str(R.string.gallery_already_in, album.name))
             return@trunkCall
         }
         applyAlbum(TrunkClient.addToAlbum(albumId, fresh))
-        message = Message("${fresh.size} zu „${album.name}“ hinzugefügt")
+        message = Message(str(R.string.gallery_added_to, fresh.size, album.name))
     }
 
     fun trunkRemoveFrom(albumId: Long, imageIds: Collection<Long>) = trunkCall {
         val ids = remoteIds(imageIds)
         applyAlbum(TrunkClient.removeFromAlbum(albumId, ids))
-        message = Message("${ids.size} aus dem Album entfernt", "Rückgängig") {
+        message = Message(str(R.string.gallery_removed_from_album, ids.size), str(R.string.gallery_undo)) {
             trunkCall { applyAlbum(TrunkClient.addToAlbum(albumId, ids)) }
         }
     }
@@ -471,7 +474,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         TrunkClient.deleteAlbum(albumId)
         applyAlbum(null, deletedId = albumId)
         if (open == Source.TrunkAlbum(albumId)) open = null
-        message = Message("Album „${album.name}“ gelöscht. Die Bilder bleiben erhalten.", "Rückgängig") {
+        message = Message(str(R.string.gallery_album_deleted, album.name), str(R.string.gallery_undo)) {
             // The server forgets deleted albums; a new one with the same content takes its place.
             trunkCall { applyAlbum(TrunkClient.createAlbum(album.name, album.assetIds)) }
         }
@@ -488,7 +491,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val id = image.remote?.id ?: return@trunkCall
         TrunkLibrary.put(getApplication(), TrunkClient.revertEdit(id))
         trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
-        message = Message("Bearbeitung verworfen, Original wiederhergestellt")
+        message = Message(str(R.string.gallery_edit_reverted))
     }
 
     fun trunkTrash(images: List<MediaImage>) = trunkCall {
@@ -497,7 +500,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         TrunkClient.trash(ids)
         selection = emptySet()
         syncTrunk()
-        message = Message(if (ids.size == 1) "1 Bild in trunks Papierkorb" else "${ids.size} Bilder in trunks Papierkorb", "Rückgängig") {
+        message = Message(plural(R.plurals.gallery_trunk_trashed, ids.size, ids.size), str(R.string.gallery_undo)) {
             trunkCall { TrunkClient.restore(ids); syncTrunk() }
         }
     }
@@ -529,14 +532,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun titleOf(source: Source?): String = when (source) {
         null -> "peek"
-        Source.All -> "Alle Bilder"
-        Source.Favorites -> "Favoriten"
-        Source.Trash -> "Papierkorb"
+        Source.All -> str(R.string.gallery_all_photos)
+        Source.Favorites -> str(R.string.gallery_favorites)
+        Source.Trash -> str(R.string.gallery_trash)
         is Source.Folder -> folders.firstOrNull { it.bucketId == source.bucketId }?.name ?: ""
         is Source.User -> userAlbums.firstOrNull { it.id == source.id }?.name ?: ""
         Source.Trunk -> "trunk"
-        is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.title ?: ""
-        is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.title ?: "Rückblick"
+        is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.title(getApplication()) ?: ""
+        is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.title(getApplication<Application>().resources) ?: str(R.string.gallery_memories)
     }
 
     fun reload(then: (() -> Unit)? = null) {
@@ -625,7 +628,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         }
         val items = reviewPending
         if (items.isEmpty()) {
-            message = Message("Nichts Neues zum Durchsehen")
+            message = Message(str(R.string.gallery_nothing_to_review))
             return
         }
         viewerIndex = null
@@ -655,14 +658,14 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val a = userAlbums.firstOrNull { it.id == albumId } ?: return
         val fresh = ids.filter { it !in a.ids }
         saveAlbums(userAlbums.map { if (it.id == albumId) it.copy(ids = fresh + it.ids) else it })
-        message = Message(if (fresh.isEmpty()) "Schon in „${a.name}“" else "${fresh.size} zu „${a.name}“ hinzugefügt")
+        message = Message(if (fresh.isEmpty()) str(R.string.gallery_already_in, a.name) else str(R.string.gallery_added_to, fresh.size, a.name))
     }
 
     fun removeFrom(albumId: String, ids: Collection<Long>) {
         val set = ids.toHashSet()
         val before = userAlbums
         saveAlbums(userAlbums.map { if (it.id == albumId) it.copy(ids = it.ids.filterNot { id -> id in set }) else it })
-        message = Message("${set.size} aus dem Album entfernt", "Rückgängig") { saveAlbums(before) }
+        message = Message(str(R.string.gallery_removed_from_album, set.size), str(R.string.gallery_undo)) { saveAlbums(before) }
     }
 
     fun renameAlbum(albumId: String, name: String) {
@@ -674,7 +677,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         val name = userAlbums.firstOrNull { it.id == albumId }?.name ?: ""
         saveAlbums(userAlbums.filterNot { it.id == albumId })
         if (open == Source.User(albumId)) open = null
-        message = Message("Album „$name“ gelöscht. Die Bilder bleiben erhalten.", "Rückgängig") { saveAlbums(before) }
+        message = Message(str(R.string.gallery_album_deleted, name), str(R.string.gallery_undo)) { saveAlbums(before) }
     }
 
     /** Cover for a user album: its most recently added photo that still exists. */

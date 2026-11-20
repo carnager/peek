@@ -53,6 +53,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import io.github.carnager.peek.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -272,51 +274,51 @@ fun ImageViewer(
                     .statusBarsPadding()
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             ) {
-                GlassButton(Icons.AutoMirrored.Rounded.ArrowBack, "Zurück", onClose)
+                GlassButton(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.view_back), onClose)
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text(current.name, color = Color.White, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                     if (items.size > 1) {
-                        Text("${pager.currentPage + 1} von ${items.size}", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.view_position, pager.currentPage + 1, items.size), color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium)
                     }
                 }
                 Box {
-                    GlassButton(Icons.Rounded.MoreVert, "Mehr") { menu = true }
+                    GlassButton(Icons.Rounded.MoreVert, stringResource(R.string.view_more)) { menu = true }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
                         DropdownMenuItem(
-                            text = { Text("Öffnen mit") },
+                            text = { Text(stringResource(R.string.view_open_with)) },
                             leadingIcon = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null) },
                             onClick = { menu = false; openWith(ctx, current) },
                         )
                         if (onSend != null && current.owner == null) {
                             DropdownMenuItem(
-                                text = { Text("An Person senden") },
+                                text = { Text(stringResource(R.string.view_send_to_person)) },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Send, null) },
                                 onClick = { menu = false; onSend(current) },
                             )
                         }
                         if (onLink != null && current.owner == null) {
                             DropdownMenuItem(
-                                text = { Text("Link erstellen") },
+                                text = { Text(stringResource(R.string.view_create_link)) },
                                 leadingIcon = { Icon(Icons.Rounded.Link, null) },
                                 onClick = { menu = false; onLink(current) },
                             )
                         }
                         if (onAddToAlbum != null) {
                             DropdownMenuItem(
-                                text = { Text("Zu Album hinzufügen") },
+                                text = { Text(stringResource(R.string.view_add_to_album)) },
                                 leadingIcon = { Icon(Icons.Rounded.PhotoAlbum, null) },
                                 onClick = { menu = false; onAddToAlbum(current) },
                             )
                         }
                         if (onRevertEdit != null && current.edited && current.owner == null) {
                             DropdownMenuItem(
-                                text = { Text("Bearbeitung verwerfen") },
+                                text = { Text(stringResource(R.string.view_revert_edit)) },
                                 leadingIcon = { Icon(Icons.Rounded.Restore, null) },
                                 onClick = { menu = false; onRevertEdit(current) },
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("Festlegen als") },
+                            text = { Text(stringResource(R.string.view_set_as)) },
                             leadingIcon = { Icon(Icons.Rounded.Wallpaper, null) },
                             onClick = { menu = false; setAs(ctx, current) },
                         )
@@ -340,13 +342,13 @@ fun ImageViewer(
                         .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    PillIcon(Icons.Rounded.Share, "Teilen") { onShare?.invoke(current) ?: share(ctx, listOf(current.uri), current.mimeType) }
+                    PillIcon(Icons.Rounded.Share, stringResource(R.string.view_share)) { onShare?.invoke(current) ?: share(ctx, listOf(current.uri), current.mimeType) }
                     if (onFavorite != null && current.owner == null) {
                         FavoriteIcon(current.favorite) { onFavorite(current) }
                     }
-                    if (!current.isVideo && current.owner == null) PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
-                    if (onDelete != null && current.owner == null) PillIcon(Icons.Rounded.DeleteOutline, "Löschen") { onDelete(current) }
-                    PillIcon(Icons.Rounded.Info, "Info") { info = current }
+                    if (!current.isVideo && current.owner == null) PillIcon(Icons.Rounded.AutoFixHigh, stringResource(R.string.view_edit), highlight = true) { onEdit(current) }
+                    if (onDelete != null && current.owner == null) PillIcon(Icons.Rounded.DeleteOutline, stringResource(R.string.view_delete)) { onDelete(current) }
+                    PillIcon(Icons.Rounded.Info, stringResource(R.string.view_info)) { info = current }
                 }
             }
         }
@@ -402,7 +404,7 @@ private fun FavoriteIcon(on: Boolean, onClick: () -> Unit) {
     ) {
         Icon(
             if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-            if (on) "Aus Favoriten entfernen" else "Zu Favoriten",
+            stringResource(if (on) R.string.view_favorite_remove else R.string.view_favorite_add),
             tint = if (on) Color(0xFFFF4D6D) else Color.White,
             modifier = Modifier.graphicsLayer { scaleX = scale.value; scaleY = scale.value },
         )

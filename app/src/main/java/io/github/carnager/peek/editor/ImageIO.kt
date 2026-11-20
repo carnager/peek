@@ -1,5 +1,6 @@
 package io.github.carnager.peek.editor
 
+import io.github.carnager.peek.R
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
@@ -178,7 +179,7 @@ object ImageIO {
                     lastError = e
                 }
             }
-            throw lastError ?: IllegalStateException("Speichern fehlgeschlagen")
+            throw lastError ?: IllegalStateException(context.getString(R.string.edit_save_failed))
         } finally {
             tmp.delete()
         }
@@ -186,7 +187,7 @@ object ImageIO {
 
     /** Replaces the original's bytes. The caller must already hold write access to [source]. */
     suspend fun overwrite(context: Context, bitmap: Bitmap, source: SourceInfo, quality: Int) = withContext(Dispatchers.IO) {
-        val format = SaveFormat.forMime(source.mimeType) ?: error("Format ${source.mimeType} kann nicht geschrieben werden")
+        val format = SaveFormat.forMime(source.mimeType) ?: error(context.getString(R.string.edit_format_not_writable, source.mimeType))
         val exif = readExif(context, source.uri)
         val tmp = encode(context, bitmap, format, quality, exif)
         try {

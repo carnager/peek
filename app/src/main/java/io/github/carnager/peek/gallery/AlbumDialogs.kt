@@ -19,11 +19,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.carnager.peek.R
 import io.github.carnager.peek.ui.bounceClick
 
 /**
@@ -43,7 +46,7 @@ private fun TrunkAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () ->
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Text(
-                if (ids.size == 1) "Zu Album auf trunk hinzufügen" else "${ids.size} Bilder zu Album auf trunk hinzufügen",
+                pluralStringResource(R.plurals.gallery_add_to_trunk_album_title, ids.size, ids.size),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -56,7 +59,7 @@ private fun TrunkAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () ->
                     val already = remoteIds.all { it in a.assetIds }
                     AlbumRow(
                         title = a.name,
-                        subtitle = if (already) "Schon enthalten" else listOfNotNull(a.owner?.let { "von $it" }, "${a.assetIds.size} Bilder").joinToString(" · "),
+                        subtitle = if (already) stringResource(R.string.gallery_already_added) else listOfNotNull(a.owner?.let { stringResource(R.string.gallery_by_owner, it) }, pluralStringResource(R.plurals.gallery_photo_count, a.assetIds.size, a.assetIds.size)).joinToString(" · "),
                         leading = { AlbumThumb(cover) },
                         trailing = if (already) ({ Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary) }) else null,
                     ) {
@@ -68,7 +71,7 @@ private fun TrunkAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () ->
         }
     }
     if (creating) {
-        NameDialog(title = "Neues Album auf trunk", initial = "", confirm = "Anlegen", onDismiss = { creating = false }) { name ->
+        NameDialog(title = stringResource(R.string.gallery_new_trunk_album), initial = "", confirm = stringResource(R.string.gallery_create), onDismiss = { creating = false }) { name ->
             vm.trunkCreateAlbum(name, ids)
             creating = false
             onDone()
@@ -79,7 +82,7 @@ private fun TrunkAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () ->
 @Composable
 private fun NewAlbumRow(onClick: () -> Unit) {
     AlbumRow(
-        title = "Neues Album",
+        title = stringResource(R.string.gallery_new_album),
         subtitle = null,
         leading = {
             Box(
@@ -106,13 +109,14 @@ private fun AlbumThumb(cover: MediaImage?) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocalAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var creating by remember { mutableStateOf(false) }
     val byId = remember(vm.images) { vm.images.associateBy { it.id } }
     // Always fully open, so one back gesture closes it instead of first halving it.
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Text(
-                if (ids.size == 1) "Zu Album hinzufügen" else "${ids.size} Bilder zu Album hinzufügen",
+                pluralStringResource(R.plurals.gallery_add_to_album_title, ids.size, ids.size),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -124,7 +128,7 @@ private fun LocalAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () ->
                     val already = ids.all { it in a.ids }
                     AlbumRow(
                         title = a.name,
-                        subtitle = if (already) "Schon enthalten" else "${a.ids.count { it in byId }} Bilder",
+                        subtitle = if (already) stringResource(R.string.gallery_already_added) else a.ids.count { it in byId }.let { n -> pluralStringResource(R.plurals.gallery_photo_count, n, n) },
                         leading = { AlbumThumb(cover) },
                         trailing = if (already) ({ Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary) }) else null,
                     ) {
@@ -136,9 +140,9 @@ private fun LocalAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () ->
         }
     }
     if (creating) {
-        NameDialog(title = "Neues Album", initial = "", confirm = "Anlegen", onDismiss = { creating = false }) { name ->
+        NameDialog(title = stringResource(R.string.gallery_new_album), initial = "", confirm = stringResource(R.string.gallery_create), onDismiss = { creating = false }) { name ->
             val a = vm.createAlbum(name, ids)
-            vm.message = Message("${ids.size} zu „${a.name}“ hinzugefügt")
+            vm.message = Message(ctx.getString(R.string.gallery_added_to, ids.size, a.name))
             creating = false
             onDone()
         }
@@ -181,7 +185,7 @@ fun NameDialog(title: String, initial: String, confirm: String, onDismiss: () ->
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
-                placeholder = { Text("Name") },
+                placeholder = { Text(stringResource(R.string.gallery_album_name)) },
                 shape = RoundedCornerShape(16.dp),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (ok) onConfirm(name.text) }),
@@ -190,7 +194,7 @@ fun NameDialog(title: String, initial: String, confirm: String, onDismiss: () ->
             LaunchedEffect(Unit) { focus.requestFocus() }
         },
         confirmButton = { Button(onClick = { onConfirm(name.text) }, enabled = ok) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.gallery_cancel)) } },
     )
 }
 
@@ -216,19 +220,19 @@ fun ShareAlbumSheet(vm: GalleryViewModel, album: io.github.carnager.peek.trunk.R
     val current = vm.trunkAlbums.firstOrNull { it.id == album.id } ?: album
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
-            Text("„${current.name}“ teilen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.gallery_share_album_title, current.name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                "Mit den anderen Konten auf deinem trunk. Sie sehen das Album; mit „Hinzufügen“ können sie eigene Fotos dazulegen.",
+                stringResource(R.string.gallery_share_album_text),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
             )
             val list = people
             when {
-                failed -> Text("trunk nicht erreichbar", color = MaterialTheme.colorScheme.error)
+                failed -> Text(stringResource(R.string.gallery_trunk_unreachable), color = MaterialTheme.colorScheme.error)
                 list == null -> CircularProgressIndicator(Modifier.padding(16.dp).align(Alignment.CenterHorizontally))
                 list.isEmpty() -> Text(
-                    "Auf diesem trunk gibt es noch keine anderen Konten. Anlegen mit: trunk user add NAME",
+                    stringResource(R.string.gallery_share_no_accounts),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 else -> list.forEach { (id, name) ->
@@ -240,11 +244,11 @@ fun ShareAlbumSheet(vm: GalleryViewModel, album: io.github.carnager.peek.trunk.R
                             SingleChoiceSegmentedButtonRow {
                                 SegmentedButton(
                                     selected = !m.canAdd, onClick = { if (m.canAdd) vm.trunkShare(current.id, id, false) },
-                                    shape = SegmentedButtonDefaults.itemShape(0, 2), label = { Text("Ansehen") },
+                                    shape = SegmentedButtonDefaults.itemShape(0, 2), label = { Text(stringResource(R.string.gallery_share_view)) },
                                 )
                                 SegmentedButton(
                                     selected = m.canAdd, onClick = { if (!m.canAdd) vm.trunkShare(current.id, id, true) },
-                                    shape = SegmentedButtonDefaults.itemShape(1, 2), label = { Text("Hinzufügen") },
+                                    shape = SegmentedButtonDefaults.itemShape(1, 2), label = { Text(stringResource(R.string.gallery_share_add)) },
                                 )
                             }
                         }
@@ -273,22 +277,22 @@ fun SendSheet(vm: GalleryViewModel, images: List<MediaImage>, onDone: () -> Unit
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             Text(
-                if (images.size == 1) "Senden an …" else "${images.size} Bilder senden an …",
+                pluralStringResource(R.plurals.gallery_send_title, images.size, images.size),
                 style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
             val list = people
             when {
-                failed -> Text("trunk nicht erreichbar", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))
+                failed -> Text(stringResource(R.string.gallery_trunk_unreachable), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))
                 list == null -> CircularProgressIndicator(Modifier.padding(24.dp).align(Alignment.CenterHorizontally))
                 list.isEmpty() -> Text(
-                    "Auf deinem trunk gibt es noch niemanden außer dir. Anlegen mit: trunk user add NAME",
+                    stringResource(R.string.gallery_send_no_one),
                     style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp),
                 )
                 else -> list.forEach { (id, name) ->
                     AlbumRow(
                         title = name,
-                        subtitle = "Sieht die Bilder unter „Geteilt“",
+                        subtitle = stringResource(R.string.gallery_send_hint),
                         leading = {
                             Box(
                                 Modifier.size(52.dp).clip(RoundedCornerShape(26.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
@@ -323,31 +327,31 @@ fun LinkSheet(vm: GalleryViewModel, albumId: Long?, images: List<MediaImage>, de
     var error by remember { mutableStateOf<String?>(null) }
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
-            Text("Öffentlicher Link", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.gallery_link_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                "Jeder mit dem Link sieht diese Bilder im Browser, ohne Konto. Du kannst ihn jederzeit zurückziehen.",
+                stringResource(R.string.gallery_link_text),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
             )
             val done = url
             if (done == null) {
-                OutlinedTextField(title, { title = it }, label = { Text("Titel") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(title, { title = it }, label = { Text(stringResource(R.string.gallery_link_label_title)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(
                     Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(12.dp)).bounceClick(pressedScale = 0.98f) { stripLocation = !stripLocation },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Aufnahmeort entfernen", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.gallery_link_strip_location), style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "Die Originale lassen sich herunterladen. Ohne Ort zeigen sie nicht, wo sie entstanden sind, etwa bei dir zu Hause.",
+                            stringResource(R.string.gallery_link_strip_location_text),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Switch(checked = stripLocation, onCheckedChange = null)
                 }
-                Text("Gültig", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+                Text(stringResource(R.string.gallery_link_valid), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf(0 to "Unbegrenzt", 7 to "7 Tage", 30 to "30 Tage").forEachIndexed { i, (d, label) ->
+                    listOf(0 to stringResource(R.string.gallery_link_unlimited), 7 to pluralStringResource(R.plurals.gallery_days, 7, 7), 30 to pluralStringResource(R.plurals.gallery_days, 30, 30)).forEachIndexed { i, (d, label) ->
                         SegmentedButton(selected = days == d, onClick = { days = d }, shape = SegmentedButtonDefaults.itemShape(i, 3), label = { Text(label) })
                     }
                 }
@@ -362,7 +366,7 @@ fun LinkSheet(vm: GalleryViewModel, albumId: Long?, images: List<MediaImage>, de
                             } catch (e: kotlinx.coroutines.CancellationException) {
                                 throw e
                             } catch (e: Exception) {
-                                error = e.message ?: "Link konnte nicht erstellt werden"
+                                error = e.message ?: ctx.getString(R.string.gallery_link_failed)
                             } finally {
                                 busy = false
                             }
@@ -370,15 +374,15 @@ fun LinkSheet(vm: GalleryViewModel, albumId: Long?, images: List<MediaImage>, de
                     },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(52.dp),
-                ) { Text("Link erstellen") }
+                ) { Text(stringResource(R.string.gallery_link_create)) }
             } else {
                 Text(done, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { shareLink(ctx, title, done) }, modifier = Modifier.weight(1f)) { Text("Teilen") }
+                    Button(onClick = { shareLink(ctx, title, done) }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.gallery_share)) }
                     OutlinedButton(onClick = {
                         copyLink(ctx, done)
-                        vm.message = Message("Link kopiert")
-                    }, modifier = Modifier.weight(1f)) { Text("Kopieren") }
+                        vm.message = Message(ctx.getString(R.string.gallery_link_copied))
+                    }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.gallery_copy)) }
                 }
             }
         }
@@ -398,35 +402,35 @@ fun LinksSheet(vm: GalleryViewModel, onDone: () -> Unit) {
     LaunchedEffect(Unit) { load() }
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
-            Text("Öffentliche Links", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+            Text(stringResource(R.string.gallery_links_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
             val list = links
             when {
                 list == null -> CircularProgressIndicator(Modifier.padding(16.dp).align(Alignment.CenterHorizontally))
-                list.isEmpty() -> Text("Keine aktiven Links.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                list.isEmpty() -> Text(stringResource(R.string.gallery_links_none), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> LazyColumn(Modifier.heightIn(max = 480.dp)) {
                     items(list, key = { it.getString("token") }) { l ->
                         val url = io.github.carnager.peek.trunk.TrunkAccount.linkUrl(l.getString("path"))
                         val n = l.optJSONArray("asset_ids")?.length() ?: 0
-                        val count = if (l.has("album_id")) "Album" else if (n == 1) "1 Bild" else "$n Bilder"
+                        val count = if (l.has("album_id")) stringResource(R.string.gallery_album) else pluralStringResource(R.plurals.gallery_photo_count, n, n)
                         val until = l.optString("expires_at").takeIf { it.isNotEmpty() }?.let {
                             runCatching { java.text.DateFormat.getDateInstance().format(java.util.Date(java.time.Instant.parse(it).toEpochMilli())) }.getOrNull()
                         }
                         Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                             Text(l.optString("title"), style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                listOfNotNull(count, until?.let { "bis $it" } ?: "unbegrenzt", if (l.optBoolean("strip_location", true)) "ohne Ort" else "mit Ort").joinToString(" · "),
+                                listOfNotNull(count, until?.let { stringResource(R.string.gallery_links_until, it) } ?: stringResource(R.string.gallery_links_unlimited), if (l.optBoolean("strip_location", true)) stringResource(R.string.gallery_links_no_location) else stringResource(R.string.gallery_links_with_location)).joinToString(" · "),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                                TextButton(onClick = { shareLink(ctx, l.optString("title"), url) }) { Text("Teilen") }
+                                TextButton(onClick = { shareLink(ctx, l.optString("title"), url) }) { Text(stringResource(R.string.gallery_share)) }
                                 TextButton(onClick = {
                                     scope.launch {
                                         runCatching { io.github.carnager.peek.trunk.TrunkClient.revokeLink(l.getString("token")) }
-                                            .onSuccess { vm.message = Message("Link zurückgezogen") }
+                                            .onSuccess { vm.message = Message(ctx.getString(R.string.gallery_link_revoked)) }
                                             .onFailure { vm.message = Message("trunk: ${it.message}") }
                                         load()
                                     }
-                                }) { Text("Zurückziehen", color = MaterialTheme.colorScheme.error) }
+                                }) { Text(stringResource(R.string.gallery_link_revoke), color = MaterialTheme.colorScheme.error) }
                             }
                         }
                     }
@@ -440,7 +444,7 @@ private fun shareLink(ctx: android.content.Context, title: String, url: String) 
     val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
         .putExtra(android.content.Intent.EXTRA_SUBJECT, title)
         .putExtra(android.content.Intent.EXTRA_TEXT, url)
-    ctx.startActivity(android.content.Intent.createChooser(send, "Link teilen"))
+    ctx.startActivity(android.content.Intent.createChooser(send, ctx.getString(R.string.gallery_share_link)))
 }
 
 private fun copyLink(ctx: android.content.Context, url: String) {

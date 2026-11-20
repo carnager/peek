@@ -64,6 +64,8 @@ import androidx.compose.ui.draw.clip
 import io.github.carnager.peek.ui.ToolSheet
 import io.github.carnager.peek.ui.bounceClick
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import io.github.carnager.peek.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -119,15 +121,15 @@ fun EditorScreen(
                 Column(Modifier.fillMaxSize()) {
                     if (tool == null) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            FilledTonalIconButton(onClick = ::close) { Icon(Icons.Rounded.Close, "Schließen") }
+                            FilledTonalIconButton(onClick = ::close) { Icon(Icons.Rounded.Close, stringResource(R.string.edit_close)) }
                             Spacer(Modifier.weight(1f))
-                            IconButton(onClick = vm::undo, enabled = vm.canUndo) { Icon(Icons.AutoMirrored.Rounded.Undo, "Rückgängig") }
-                            IconButton(onClick = vm::redo, enabled = vm.canRedo) { Icon(Icons.AutoMirrored.Rounded.Redo, "Wiederholen") }
+                            IconButton(onClick = vm::undo, enabled = vm.canUndo) { Icon(Icons.AutoMirrored.Rounded.Undo, stringResource(R.string.edit_undo)) }
+                            IconButton(onClick = vm::redo, enabled = vm.canRedo) { Icon(Icons.AutoMirrored.Rounded.Redo, stringResource(R.string.edit_redo)) }
                             Spacer(Modifier.width(6.dp))
                             Button(onClick = { showSave = true }, enabled = vm.isDirty) {
                                 Icon(Icons.Rounded.Check, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Speichern", fontWeight = FontWeight.SemiBold)
+                                Text(stringResource(R.string.edit_save), fontWeight = FontWeight.SemiBold)
                             }
                         }
                         // Holding a finger on the image shows the original for comparison.
@@ -145,7 +147,7 @@ fun EditorScreen(
                                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
                             ) {
                                 Text(
-                                    "Original",
+                                    stringResource(R.string.edit_original),
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 14.dp, vertical = 6.dp),
                                 )
@@ -171,7 +173,7 @@ fun EditorScreen(
                                             contentAlignment = Alignment.Center,
                                         ) { Icon(t.icon(), null, tint = MaterialTheme.colorScheme.primary) }
                                         Spacer(Modifier.height(6.dp))
-                                        Text(t.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                                        Text(stringResource(t.label), style = MaterialTheme.typography.labelSmall, maxLines = 1)
                                     }
                                 }
                             }
@@ -200,7 +202,7 @@ fun EditorScreen(
     vm.error?.takeIf { vm.preview != null }?.let { msg ->
         AlertDialog(
             onDismissRequest = { vm.error = null },
-            confirmButton = { TextButton(onClick = { vm.error = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { vm.error = null }) { Text(stringResource(R.string.edit_ok)) } },
             text = { Text(msg) },
         )
     }
@@ -208,9 +210,9 @@ fun EditorScreen(
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
-            title = { Text("Änderungen verwerfen?") },
-            confirmButton = { TextButton(onClick = { confirmDiscard = false; onClose() }) { Text("Verwerfen") } },
-            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Weiter bearbeiten") } },
+            title = { Text(stringResource(R.string.edit_discard_title)) },
+            confirmButton = { TextButton(onClick = { confirmDiscard = false; onClose() }) { Text(stringResource(R.string.edit_discard)) } },
+            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.edit_keep_editing)) } },
         )
     }
 
@@ -250,7 +252,7 @@ fun EditorScreen(
 @Composable
 fun ToolActions(title: String, onCancel: () -> Unit, onApply: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, "Abbrechen") }
+        FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, stringResource(R.string.edit_cancel)) }
         Text(
             title,
             style = MaterialTheme.typography.titleMedium,
@@ -258,7 +260,7 @@ fun ToolActions(title: String, onCancel: () -> Unit, onApply: () -> Unit) {
             modifier = Modifier.weight(1f),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        FilledIconButton(onClick = onApply, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Check, "Übernehmen") }
+        FilledIconButton(onClick = onApply, modifier = Modifier.size(48.dp)) { Icon(Icons.Rounded.Check, stringResource(R.string.edit_apply)) }
     }
 }
 
@@ -280,10 +282,10 @@ private fun ResizeDialog(width: Int, height: Int, onDismiss: () -> Unit, onApply
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Größe ändern") },
+        title = { Text(stringResource(R.string.edit_resize_title)) },
         text = {
             Column {
-                Text("Aktuell $width × $height", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.edit_resize_current, width, height), style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
@@ -292,13 +294,13 @@ private fun ResizeDialog(width: Int, height: Int, onDismiss: () -> Unit, onApply
                             w = v.filter(Char::isDigit).take(5)
                             if (locked) w.toIntOrNull()?.let { h = (it / ratio).roundToInt().coerceAtLeast(1).toString() }
                         },
-                        label = { Text("Breite") },
+                        label = { Text(stringResource(R.string.edit_width)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                     )
                     IconToggleButton(checked = locked, onCheckedChange = { locked = it }) {
-                        Icon(if (locked) Icons.Rounded.Lock else Icons.Rounded.LockOpen, "Seitenverhältnis sperren")
+                        Icon(if (locked) Icons.Rounded.Lock else Icons.Rounded.LockOpen, stringResource(R.string.edit_lock_aspect))
                     }
                     OutlinedTextField(
                         value = h,
@@ -306,7 +308,7 @@ private fun ResizeDialog(width: Int, height: Int, onDismiss: () -> Unit, onApply
                             h = v.filter(Char::isDigit).take(5)
                             if (locked) h.toIntOrNull()?.let { w = (it * ratio).roundToInt().coerceAtLeast(1).toString() }
                         },
-                        label = { Text("Höhe") },
+                        label = { Text(stringResource(R.string.edit_height)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
@@ -314,7 +316,7 @@ private fun ResizeDialog(width: Int, height: Int, onDismiss: () -> Unit, onApply
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(25, 50, 75).forEach { p -> androidx.compose.material3.SuggestionChip(onClick = { setPercent(p) }, label = { Text("$p %") }, shape = CircleShape) }
+                    listOf(25, 50, 75).forEach { p -> androidx.compose.material3.SuggestionChip(onClick = { setPercent(p) }, label = { Text(stringResource(R.string.edit_resize_percent, p)) }, shape = CircleShape) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     // Common long-edge targets for messengers and the web.
@@ -334,12 +336,12 @@ private fun ResizeDialog(width: Int, height: Int, onDismiss: () -> Unit, onApply
                     }
                 }
                 if (!valid && wi != null && hi != null && wi.toLong() * hi > maxPixels) {
-                    Text("Zu groß für den Speicher", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.edit_too_large), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
-        confirmButton = { TextButton(enabled = valid, onClick = { onApply(wi!!, hi!!) }) { Text("Übernehmen") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        confirmButton = { TextButton(enabled = valid, onClick = { onApply(wi!!, hi!!) }) { Text(stringResource(R.string.edit_apply)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.edit_cancel)) } },
     )
 }
 
@@ -362,7 +364,7 @@ private fun SaveDialog(
 
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
-            Text("Speichern", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.edit_save), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text(
                 "$width × $height px",
                 style = MaterialTheme.typography.bodyMedium,
@@ -370,7 +372,7 @@ private fun SaveDialog(
             )
             if (downscaled) {
                 Text(
-                    "Das Original (${source.originalWidth} × ${source.originalHeight}) wurde zum Bearbeiten verkleinert.",
+                    stringResource(R.string.edit_downscaled, source.originalWidth, source.originalHeight),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.padding(top = 4.dp),
@@ -389,7 +391,7 @@ private fun SaveDialog(
             }
             androidx.compose.animation.AnimatedVisibility(format.lossy) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
-                    Text("Qualität", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.edit_quality), style = MaterialTheme.typography.labelLarge)
                     Slider(value = quality, onValueChange = { quality = it }, valueRange = 50f..100f, modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                     Text("${quality.roundToInt()}", style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(32.dp))
                 }
@@ -399,18 +401,18 @@ private fun SaveDialog(
                 Button(
                     onClick = { onSaveToTrunk(format, quality.roundToInt()) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                ) { Text("Auf trunk speichern", style = MaterialTheme.typography.titleSmall) }
+                ) { Text(stringResource(R.string.edit_save_to_trunk), style = MaterialTheme.typography.titleSmall) }
                 Spacer(Modifier.height(10.dp))
                 OutlinedButton(
                     onClick = { onUploadToTrunk(format, quality.roundToInt()) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                ) { Text("Als Kopie zu trunk hochladen", style = MaterialTheme.typography.titleSmall) }
+                ) { Text(stringResource(R.string.edit_upload_copy_to_trunk), style = MaterialTheme.typography.titleSmall) }
                 androidx.compose.material3.TextButton(
                     onClick = { onSaveCopy(format, quality.roundToInt()) },
                     modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp),
-                ) { Text("Auf dem Handy speichern", style = MaterialTheme.typography.titleSmall) }
+                ) { Text(stringResource(R.string.edit_save_on_phone), style = MaterialTheme.typography.titleSmall) }
                 Text(
-                    "trunk behält das Original. Im Betrachter lässt sich die Bearbeitung über „Mehr“ wieder verwerfen.",
+                    stringResource(R.string.edit_trunk_keeps_original),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp).align(Alignment.CenterHorizontally),
@@ -419,16 +421,16 @@ private fun SaveDialog(
                 Button(
                     onClick = { onSaveCopy(format, quality.roundToInt()) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                ) { Text("Als Kopie speichern", style = MaterialTheme.typography.titleSmall) }
+                ) { Text(stringResource(R.string.edit_save_as_copy), style = MaterialTheme.typography.titleSmall) }
                 Spacer(Modifier.height(10.dp))
                 if (originalFormat != null && format == originalFormat) {
                     OutlinedButton(
                         onClick = { onOverwrite(quality.roundToInt()) },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
-                    ) { Text("Original ersetzen", style = MaterialTheme.typography.titleSmall) }
+                    ) { Text(stringResource(R.string.edit_replace_original), style = MaterialTheme.typography.titleSmall) }
                 } else {
                     Text(
-                        "Original ersetzen geht nur im Originalformat${originalFormat?.let { " (${it.name})" } ?: ""}.",
+                        originalFormat?.let { stringResource(R.string.edit_replace_needs_format, it.name) } ?: stringResource(R.string.edit_replace_needs_format_unknown),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp).align(Alignment.CenterHorizontally),

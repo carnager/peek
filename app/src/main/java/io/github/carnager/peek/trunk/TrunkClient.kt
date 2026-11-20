@@ -2,6 +2,7 @@ package io.github.carnager.peek.trunk
 
 import android.content.Context
 import android.os.Build
+import io.github.carnager.peek.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -207,13 +208,13 @@ data class RemoteAlbum(
 ) {
     val isOwner get() = owner == null
 
-    /** How to call it: its name, or for sent photos "Von alice" / "An bob". */
-    val title: String
-        get() = when {
-            !direct -> name
-            owner != null -> "Von $owner"
-            else -> "An $name"
-        }
+    /** How to call it: its name, or for sent photos "From alice" / "To bob". */
+    fun title(ctx: Context): String = when {
+        !direct -> name
+        owner != null -> ctx.getString(R.string.trunk_album_from, owner)
+        else -> ctx.getString(R.string.trunk_album_to, name)
+    }
+
     /** Shared in either direction: its photos are not all ours, so they are fetched with the album. */
     val shared get() = owner != null || members.isNotEmpty()
 
@@ -449,6 +450,7 @@ object TrunkClient {
      * so a dropped connection only costs the current chunk. [read] fills the buffer from [offset].
      */
     fun uploadResumable(
+        ctx: Context,
         name: String, mtime: Long, sha256: String, length: Long,
         chunk: Int = 8 shl 20,
         read: (offset: Long, buf: ByteArray) -> Int,
@@ -463,7 +465,7 @@ object TrunkClient {
             .build()
         val location = http.newCall(create).execute().use { r ->
             if (!r.isSuccessful) r.bodyJson()
-            r.header("Location") ?: throw TrunkException(r.code, "Server gab keine Upload-Adresse zurück")
+            r.header("Location") ?: throw TrunkException(r.code, ctx.getString(R.string.trunk_error_no_upload_address))
         }
         val uploadUrl = if (location.startsWith("http")) location else TrunkAccount.baseUrl + location
         var offset = 0L

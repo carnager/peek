@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="editor_label">peek bearbeiten</string>
+
+    <string name="edit_no_image_received">Kein Bild übergeben</string>
+    <string name="edit_saved_as_copy">Als Kopie gespeichert</string>
+    <string name="edit_saved_to_trunk">Auf trunk gespeichert, das Original bleibt erhalten</string>
+    <string name="edit_uploaded_copy_to_trunk">Als Kopie zu trunk hochgeladen</string>
+    <string name="edit_no_write_permission">Keine Schreibberechtigung für das Original. Bitte als Kopie speichern.</string>
+    <string name="edit_original_replaced">Original ersetzt</string>
+    <string name="edit_load_failed">Bild konnte nicht geladen werden: %1$s</string>
+    <string name="edit_out_of_memory">Zu wenig Speicher für diesen Schritt</string>
+    <string name="edit_no_image">Kein Bild</string>
+    <string name="edit_save_failed">Speichern fehlgeschlagen</string>
+    <string name="edit_format_not_writable">Format %1$s kann nicht geschrieben werden</string>
+
+    <string name="edit_tool_crop">Zuschneiden</string>
+    <string name="edit_tool_adjust">Anpassen</string>
+    <string name="edit_tool_filter">Filter</string>
+    <string name="edit_tool_draw">Zeichnen</string>
+    <string name="edit_tool_text">Text</string>
+    <string name="edit_tool_resize">Größe</string>
+
+    <string name="edit_close">Schließen</string>
+    <string name="edit_undo">Rückgängig</string>
+    <string name="edit_redo">Wiederholen</string>
+    <string name="edit_save">Speichern</string>
+    <string name="edit_original">Original</string>
+    <string name="edit_ok">OK</string>
+    <string name="edit_discard_title">Änderungen verwerfen?</string>
+    <string name="edit_discard">Verwerfen</string>
+    <string name="edit_keep_editing">Weiter bearbeiten</string>
+    <string name="edit_cancel">Abbrechen</string>
+    <string name="edit_apply">Übernehmen</string>
+    <string name="edit_done">Fertig</string>
+
+    <string name="edit_resize_title">Größe ändern</string>
+    <string name="edit_resize_current">Aktuell %1$d × %2$d</string>
+    <string name="edit_width">Breite</string>
+    <string name="edit_height">Höhe</string>
+    <string name="edit_lock_aspect">Seitenverhältnis sperren</string>
+    <string name="edit_resize_percent">%1$d %%</string>
+    <string name="edit_too_large">Zu groß für den Speicher</string>
+
+    <string name="edit_downscaled">Das Original (%1$d × %2$d) wurde zum Bearbeiten verkleinert.</string>
+    <string name="edit_quality">Qualität</string>
+    <string name="edit_save_to_trunk">Auf trunk speichern</string>
+    <string name="edit_upload_copy_to_trunk">Als Kopie zu trunk hochladen</string>
+    <string name="edit_save_on_phone">Auf dem Handy speichern</string>
+    <string name="edit_trunk_keeps_original">trunk behält das Original. Im Betrachter lässt sich die Bearbeitung über „Mehr“ wieder verwerfen.</string>
+    <string name="edit_save_as_copy">Als Kopie speichern</string>
+    <string name="edit_replace_original">Original ersetzen</string>
+    <string name="edit_replace_needs_format">Original ersetzen geht nur im Originalformat (%1$s).</string>
+    <string name="edit_replace_needs_format_unknown">Original ersetzen geht nur im Originalformat.</string>
+
+    <string name="edit_aspect_free">Frei</string>
+    <string name="edit_rotate_left">Links drehen</string>
+    <string name="edit_rotate_right">Rechts drehen</string>
+    <string name="edit_flip_horizontal">Horizontal spiegeln</string>
+    <string name="edit_flip_vertical">Vertikal spiegeln</string>
+    <string name="edit_reset">Zurücksetzen</string>
+
+    <string name="edit_adjust_brightness">Helligkeit</string>
+    <string name="edit_adjust_contrast">Kontrast</string>
+    <string name="edit_adjust_highlights">Lichter</string>
+    <string name="edit_adjust_shadows">Schatten</string>
+    <string name="edit_adjust_saturation">Sättigung</string>
+    <string name="edit_adjust_warmth">Wärme</string>
+    <string name="edit_adjust_tint">Tönung</string>
+    <string name="edit_adjust_fade">Verblassen</string>
+    <string name="edit_adjust_sharpen">Schärfe</string>
+    <string name="edit_adjust_vignette">Vignette</string>
+
+    <string name="edit_filter_vivid">Lebhaft</string>
+    <string name="edit_filter_warm">Warm</string>
+    <string name="edit_filter_cool">Kühl</string>
+    <string name="edit_filter_matte">Matt</string>
+    <string name="edit_filter_vintage">Vintage</string>
+    <string name="edit_filter_drama">Drama</string>
+    <string name="edit_filter_chrome">Chrom</string>
+    <string name="edit_filter_pastel">Pastell</string>
+    <string name="edit_filter_bw">S/W</string>
+    <string name="edit_filter_noir">Noir</string>
+    <string name="edit_filter_sepia">Sepia</string>
+    <string name="edit_filter_lomo">Lomo</string>
+    <string name="edit_filter_invert">Invertiert</string>
+
+    <string name="edit_draw_pen">Stift</string>
+    <string name="edit_draw_marker">Marker</string>
+    <string name="edit_draw_arrow">Pfeil</string>
+    <string name="edit_draw_pixelate">Verpixeln</string>
+    <string name="edit_draw_blur">Weichzeichnen</string>
+    <string name="edit_draw_remove_last">Letzten Strich entfernen</string>
+    <string name="edit_draw_pixelate_hint">Verpixeln: über Gesichter, Namen oder Kennzeichen malen</string>
+    <string name="edit_draw_blur_hint">Weichzeichnen: über die Stelle malen</string>
+
+    <string name="edit_text_invalid_font">Keine gültige Schriftdatei</string>
+    <string name="edit_text_edit">Text ändern</string>
+    <string name="edit_text_alignment">Ausrichtung</string>
+    <string name="edit_text_bold">Fett</string>
+    <string name="edit_text_remove">Text entfernen</string>
+    <string name="edit_text_import_font">" Schrift importieren"</string>
+    <string name="edit_text_hint">Text eingeben</string>
+    <string name="edit_style_plain">Normal</string>
+    <string name="edit_style_shadow">Schatten</string>
+    <string name="edit_style_outline">Kontur</string>
+    <string name="edit_style_box">Box</string>
+    <string name="edit_style_soft_box">Box hell</string>
+    <string name="edit_font_typewriter">Schreibmaschine</string>
+
+    <string name="view_back">Zurück</string>
+    <string name="view_position">%1$d von %2$d</string>
+    <string name="view_more">Mehr</string>
+    <string name="view_open_with">Öffnen mit</string>
+    <string name="view_send_to_person">An Person senden</string>
+    <string name="view_create_link">Link erstellen</string>
+    <string name="view_add_to_album">Zu Album hinzufügen</string>
+    <string name="view_revert_edit">Bearbeitung verwerfen</string>
+    <string name="view_set_as">Festlegen als</string>
+    <string name="view_share">Teilen</string>
+    <string name="view_edit">Bearbeiten</string>
+    <string name="view_delete">Löschen</string>
+    <string name="view_info">Info</string>
+    <string name="view_favorite_add">Zu Favoriten</string>
+    <string name="view_favorite_remove">Aus Favoriten entfernen</string>
+    <string name="view_play">Abspielen</string>
+    <string name="view_pause">Pause</string>
+    <string name="view_mute">Ton aus</string>
+    <string name="view_unmute">Ton an</string>
+
+    <string name="view_time">%1$s Uhr</string>
+    <string name="view_photo_by">Foto von %1$s</string>
+    <string name="view_add_caption">Beschreibung hinzufügen</string>
+    <string name="view_caption">Beschreibung</string>
+    <string name="view_save">Speichern</string>
+    <string name="view_cancel">Abbrechen</string>
+    <string name="view_duration">Länge</string>
+    <string name="view_folder">Ordner</string>
+    <string name="view_camera">Kamera</string>
+    <string name="view_focal_35mm">%1$d mm Kleinbild-Äquivalent</string>
+    <string name="view_flash">Blitz</string>
+    <string name="view_location">Aufnahmeort</string>
+    <string name="view_location_hidden">Aufnahmeort ausgeblendet</string>
+    <string name="view_location_hint">Tippen, um peek Standortdaten in Fotos lesen zu lassen.</string>
+    <string name="view_edited_with">Bearbeitet mit %1$s</string>
+</resources>

@@ -13,9 +13,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.carnager.peek.BuildConfig
+import io.github.carnager.peek.R
 import io.github.carnager.peek.gallery.GalleryViewModel
 import io.github.carnager.peek.gallery.MediaOps
 import io.github.carnager.peek.gallery.Message
@@ -31,6 +35,7 @@ import io.github.carnager.peek.ui.bounceClick
 @Composable
 fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
+    val ctx = LocalContext.current
     val camera = remember(vm.folders) { vm.folders.firstOrNull { it.cover.relativePath?.startsWith("DCIM/Camera", ignoreCase = true) == true }?.bucketId }
     // Until the review is set up, it would start with the camera folder.
     val review = vm.reviewSettings.let { if (it.configured) it else it.copy(buckets = setOfNotNull(camera)) }
@@ -39,42 +44,42 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
     var pickFolders by remember { mutableStateOf(false) }
     var uploadLimit by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
-    var limitLabel by remember { mutableStateOf(uploadLimitLabel()) }
+    var limitLabel by remember { mutableStateOf(uploadLimitLabel(ctx)) }
     var showLinks by remember { mutableStateOf(false) }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Zurück") } },
-                    title = { Text("Einstellungen") },
+                    navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.settings_back)) } },
+                    title = { Text(stringResource(R.string.settings_title)) },
                 )
             },
         ) { pad ->
             LazyColumn(contentPadding = PaddingValues(top = pad.calculateTopPadding(), bottom = pad.calculateBottomPadding() + 24.dp)) {
-                item { Section("Neue Bilder durchsehen") }
+                item { Section(stringResource(R.string.settings_review_section)) }
                 item {
-                    SwitchRow("Abends erinnern", "Nur wenn es Neues gibt", review.remind) { on ->
+                    SwitchRow(stringResource(R.string.settings_remind), stringResource(R.string.settings_remind_sub), review.remind) { on ->
                         if (!on) saveReview(review.copy(remind = false))
                         else ops.requestNotifications { ok ->
-                            if (ok) saveReview(review.copy(remind = true)) else vm.message = Message("Ohne Benachrichtigungen kann peek nicht erinnern.")
+                            if (ok) saveReview(review.copy(remind = true)) else vm.message = Message(ctx.getString(R.string.settings_remind_no_notifications))
                         }
                     }
                 }
                 item {
-                    Row("Uhrzeit", "%02d:%02d".format(review.hour, review.minute), enabled = review.remind) { pickTime = true }
+                    Row(stringResource(R.string.settings_time), "%02d:%02d".format(review.hour, review.minute), enabled = review.remind) { pickTime = true }
                 }
                 item {
                     val names = vm.folders.filter { it.bucketId in review.buckets }.map { it.name }
-                    Row("Ordner", when {
-                        names.isEmpty() -> "Keiner gewählt"
+                    Row(stringResource(R.string.settings_folders), when {
+                        names.isEmpty() -> stringResource(R.string.settings_folders_none)
                         names.size <= 3 -> names.joinToString(", ")
-                        else -> "${names.size} Ordner"
+                        else -> pluralStringResource(R.plurals.settings_folders_count, names.size, names.size)
                     }) { pickFolders = true }
                 }
                 item {
                     val n = vm.reviewPending.size
-                    Row("Jetzt durchsehen", if (!vm.reviewSettings.configured) "Behalten, löschen, zu trunk" else if (n == 0) "Nichts Neues" else "$n neue Bilder") {
+                    Row(stringResource(R.string.settings_review_now), if (!vm.reviewSettings.configured) stringResource(R.string.settings_review_now_sub) else if (n == 0) stringResource(R.string.settings_review_nothing_new) else pluralStringResource(R.plurals.settings_review_new_count, n, n)) {
                         if (!vm.reviewSettings.configured) saveReview(review)
                         onClose()
                         vm.startReview()
@@ -83,16 +88,16 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
 
                 item { Section("trunk") }
                 if (vm.trunkConnected) {
-                    item { Row("Server", "${TrunkAccount.user} auf ${TrunkAccount.baseUrl?.substringAfter("://")}") }
-                    item { Row("Upload-Größe", limitLabel) { uploadLimit = true } }
-                    item { Row("Öffentliche Links", "Ansehen, erneut teilen, zurückziehen") { showLinks = true } }
-                    item { Row("Abmelden", "Dieses Gerät von trunk abmelden", tint = MaterialTheme.colorScheme.error) { vm.trunkLogout() } }
+                    item { Row(stringResource(R.string.settings_server), stringResource(R.string.settings_server_sub, TrunkAccount.user.toString(), TrunkAccount.baseUrl?.substringAfter("://").toString())) }
+                    item { Row(stringResource(R.string.settings_upload_size), limitLabel) { uploadLimit = true } }
+                    item { Row(stringResource(R.string.settings_links), stringResource(R.string.settings_links_sub)) { showLinks = true } }
+                    item { Row(stringResource(R.string.settings_logout), stringResource(R.string.settings_logout_sub), tint = MaterialTheme.colorScheme.error) { vm.trunkLogout() } }
                 } else {
-                    item { Row("Mit trunk verbinden", "Fotos sichern und auf allen Geräten sehen") { connecting = true } }
+                    item { Row(stringResource(R.string.settings_connect), stringResource(R.string.settings_connect_sub)) { connecting = true } }
                 }
 
-                item { Section("Über") }
-                item { Row("peek", "Version ${BuildConfig.VERSION_NAME}") }
+                item { Section(stringResource(R.string.settings_about)) }
+                item { Row("peek", stringResource(R.string.settings_version, BuildConfig.VERSION_NAME)) }
             }
         }
     }
@@ -105,9 +110,9 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
                 TextButton(onClick = {
                     saveReview(review.copy(hour = state.hour, minute = state.minute))
                     pickTime = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.settings_ok)) }
             },
-            dismissButton = { TextButton(onClick = { pickTime = false }) { Text("Abbrechen") } },
+            dismissButton = { TextButton(onClick = { pickTime = false }) { Text(stringResource(R.string.settings_cancel)) } },
             text = { TimeInput(state) },
         )
     }
@@ -115,7 +120,7 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
         var chosen by remember { mutableStateOf(review.buckets) }
         AlertDialog(
             onDismissRequest = { pickFolders = false },
-            title = { Text("Ordner") },
+            title = { Text(stringResource(R.string.settings_folders)) },
             text = {
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
                     items(vm.folders, key = { it.bucketId }) { f ->
@@ -139,14 +144,14 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
                 TextButton(onClick = {
                     saveReview(review.copy(buckets = chosen))
                     pickFolders = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.settings_ok)) }
             },
-            dismissButton = { TextButton(onClick = { pickFolders = false }) { Text("Abbrechen") } },
+            dismissButton = { TextButton(onClick = { pickFolders = false }) { Text(stringResource(R.string.settings_cancel)) } },
         )
     }
     if (uploadLimit) UploadLimitDialog {
         uploadLimit = false
-        limitLabel = uploadLimitLabel()
+        limitLabel = uploadLimitLabel(ctx)
     }
     if (connecting) TrunkConnectDialog(vm, onDone = { connecting = false })
     if (showLinks) io.github.carnager.peek.gallery.LinksSheet(vm) { showLinks = false }

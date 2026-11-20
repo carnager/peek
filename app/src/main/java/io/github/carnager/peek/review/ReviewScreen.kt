@@ -30,9 +30,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import io.github.carnager.peek.R
 import io.github.carnager.peek.gallery.GalleryViewModel
 import io.github.carnager.peek.gallery.MediaImage
 import io.github.carnager.peek.gallery.MediaOps
@@ -54,6 +56,7 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
     var preview by remember { mutableStateOf<MediaImage?>(null) }
     val kept = remember(discard) { session.items.filter { it.id !in discard } }
     val twoSteps = vm.trunkConnected
+    val ctx = LocalContext.current
     BackHandler {
         when {
             preview != null -> preview = null
@@ -69,9 +72,9 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
         vm.finishReview(session)
         vm.message = Message(
             buildList {
-                add("Durchgesehen")
-                if (gone > 0) add("$gone gelöscht")
-                if (up > 0) add("$up gehen zu trunk")
+                add(ctx.getString(R.string.review_done))
+                if (gone > 0) add(ctx.getString(R.string.review_done_deleted, gone))
+                if (up > 0) add(ctx.resources.getQuantityString(R.plurals.review_done_uploading, up, up))
             }.joinToString(" · "),
         )
     }
@@ -80,15 +83,15 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
         Scaffold(
             topBar = {
                 TopAppBar(
-                    navigationIcon = { IconButton(onClick = { vm.review = null }) { Icon(Icons.Rounded.Close, "Später") } },
+                    navigationIcon = { IconButton(onClick = { vm.review = null }) { Icon(Icons.Rounded.Close, stringResource(R.string.review_later)) } },
                     title = {
                         Column {
-                            Text("Durchsehen")
+                            Text(stringResource(R.string.review_title))
                             Text(
                                 when {
-                                    step == 1 && twoSteps -> "Schritt 1 von 2: Was bleibt?"
-                                    step == 1 -> "Was bleibt?"
-                                    else -> "Schritt 2 von 2: Was geht zu trunk?"
+                                    step == 1 && twoSteps -> stringResource(R.string.review_step1_of2)
+                                    step == 1 -> stringResource(R.string.review_step1)
+                                    else -> stringResource(R.string.review_step2_of2)
                                 },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -98,7 +101,7 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
                     actions = {
                         if (step == 2) {
                             TextButton(onClick = { upload = if (upload.size == kept.size) emptySet() else kept.mapTo(HashSet()) { it.id } }) {
-                                Text(if (upload.size == kept.size) "Keins" else "Alle")
+                                Text(if (upload.size == kept.size) stringResource(R.string.review_select_none) else stringResource(R.string.review_select_all))
                             }
                         }
                     },
@@ -113,7 +116,7 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
                     ) {
                         if (step == 1) {
                             Text(
-                                if (discard.isEmpty()) "Tippe an, was weg soll" else "${discard.size} löschen · ${kept.size} behalten",
+                                if (discard.isEmpty()) stringResource(R.string.review_tap_hint) else stringResource(R.string.review_delete_keep, discard.size, kept.size),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f),
                             )
@@ -121,11 +124,11 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
                                 val gone = session.items.filter { it.id in discard }
                                 if (gone.isNotEmpty()) ops.trash(gone)
                                 if (twoSteps && kept.isNotEmpty()) step = 2 else finish()
-                            }) { Text(if (twoSteps && kept.isNotEmpty()) "Weiter" else "Fertig") }
+                            }) { Text(if (twoSteps && kept.isNotEmpty()) stringResource(R.string.review_next) else stringResource(R.string.review_finish)) }
                         } else {
-                            OutlinedButton(onClick = { upload = emptySet(); finish() }, modifier = Modifier.weight(1f)) { Text("Nichts hochladen") }
+                            OutlinedButton(onClick = { upload = emptySet(); finish() }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.review_upload_nothing)) }
                             Button(onClick = ::finish, enabled = upload.isNotEmpty(), modifier = Modifier.weight(1f)) {
-                                Text(if (upload.isEmpty()) "Hochladen" else "${upload.size} hochladen")
+                                Text(if (upload.isEmpty()) stringResource(R.string.review_upload) else stringResource(R.string.review_upload_count, upload.size))
                             }
                         }
                     }
@@ -162,12 +165,12 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
                             }
                             if (s == 1 && marked) {
                                 Box(Modifier.fillMaxSize().background(Color(0xCC8B1A1A)), contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Rounded.DeleteOutline, "Wird gelöscht", tint = Color.White, modifier = Modifier.size(36.dp))
+                                    Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.review_marked_delete), tint = Color.White, modifier = Modifier.size(36.dp))
                                 }
                             }
                             if (s == 2 && marked) {
                                 Icon(
-                                    Icons.Rounded.CheckCircle, "Geht zu trunk",
+                                    Icons.Rounded.CheckCircle, stringResource(R.string.review_marked_upload),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).background(Color.White, CircleShape),
                                 )

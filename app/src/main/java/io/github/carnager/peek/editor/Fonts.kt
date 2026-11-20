@@ -4,10 +4,15 @@ import android.content.Context
 import android.graphics.Typeface
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.annotation.StringRes
+import io.github.carnager.peek.R
 import java.io.File
 
-/** A font the text tool can use. [id] is stable across sessions so the last choice can be remembered. */
-data class FontOption(val id: String, val label: String)
+/**
+ * A font the text tool can use. [id] is stable across sessions so the last choice can be remembered.
+ * [labelRes], when set, is a translated name shown instead of [label].
+ */
+data class FontOption(val id: String, val label: String, @StringRes val labelRes: Int = 0)
 
 object Fonts {
     private val cache = HashMap<String, Typeface>()
@@ -35,9 +40,9 @@ object Fonts {
         "caveat" to "Caveat",
         "permanent_marker" to "Marker",
         "amatic_sc" to "Amatic",
-        "special_elite" to "Schreibmaschine",
+        "special_elite" to "Typewriter",
         "press_start_2p" to "Pixel",
-    ).map { (file, label) -> FontOption("asset:fonts/$file.ttf", label) }
+    ).map { (file, label) -> FontOption("asset:fonts/$file.ttf", label, if (file == "special_elite") R.string.edit_font_typewriter else 0) }
 
     fun userDir(context: Context) = File(context.filesDir, "fonts").apply { mkdirs() }
 

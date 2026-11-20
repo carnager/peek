@@ -1,6 +1,8 @@
 package io.github.carnager.peek.editor
 
 import android.graphics.ColorMatrix
+import androidx.annotation.StringRes
+import io.github.carnager.peek.R
 
 /** Slider values, each -1..1 except vignette (0..1). Zero means untouched. */
 data class Adjustments(
@@ -50,17 +52,17 @@ data class Adjustments(
     }
 }
 
-enum class AdjustParam(val label: String, val min: Float) {
-    BRIGHTNESS("Helligkeit", -1f),
-    CONTRAST("Kontrast", -1f),
-    HIGHLIGHTS("Lichter", -1f),
-    SHADOWS("Schatten", -1f),
-    SATURATION("Sättigung", -1f),
-    WARMTH("Wärme", -1f),
-    TINT("Tönung", -1f),
-    FADE("Verblassen", 0f),
-    SHARPEN("Schärfe", 0f),
-    VIGNETTE("Vignette", 0f);
+enum class AdjustParam(@StringRes val label: Int, val min: Float) {
+    BRIGHTNESS(R.string.edit_adjust_brightness, -1f),
+    CONTRAST(R.string.edit_adjust_contrast, -1f),
+    HIGHLIGHTS(R.string.edit_adjust_highlights, -1f),
+    SHADOWS(R.string.edit_adjust_shadows, -1f),
+    SATURATION(R.string.edit_adjust_saturation, -1f),
+    WARMTH(R.string.edit_adjust_warmth, -1f),
+    TINT(R.string.edit_adjust_tint, -1f),
+    FADE(R.string.edit_adjust_fade, 0f),
+    SHARPEN(R.string.edit_adjust_sharpen, 0f),
+    VIGNETTE(R.string.edit_adjust_vignette, 0f);
 
     fun get(a: Adjustments) = when (this) {
         BRIGHTNESS -> a.brightness
@@ -89,7 +91,7 @@ enum class AdjustParam(val label: String, val min: Float) {
     }
 }
 
-class FilterPreset(val name: String, val vignette: Float = 0f, private val build: () -> ColorMatrix) {
+class FilterPreset(@StringRes val name: Int, val vignette: Float = 0f, private val build: () -> ColorMatrix) {
     fun matrix(intensity: Float): ColorMatrix = lerp(ColorMatrix(), build(), intensity)
 }
 
@@ -118,20 +120,20 @@ private fun lerp(a: ColorMatrix, b: ColorMatrix, t: Float): ColorMatrix {
 }
 
 val FILTERS: List<FilterPreset> = listOf(
-    FilterPreset("Original") { ColorMatrix() },
-    FilterPreset("Lebhaft") { chain(saturate(1.45f), contrast(1.12f)) },
-    FilterPreset("Warm") { chain(scaleOffset(1.10f, 1.02f, 0.88f, 8f, 4f, -6f), saturate(1.1f)) },
-    FilterPreset("Kühl") { chain(scaleOffset(0.90f, 1.0f, 1.12f, -4f, 2f, 10f), saturate(0.95f)) },
-    FilterPreset("Matt") { chain(saturate(0.85f), scaleOffset(0.82f, 0.82f, 0.82f, 32f, 30f, 34f)) },
-    FilterPreset("Vintage", vignette = 0.35f) {
+    FilterPreset(R.string.edit_original) { ColorMatrix() },
+    FilterPreset(R.string.edit_filter_vivid) { chain(saturate(1.45f), contrast(1.12f)) },
+    FilterPreset(R.string.edit_filter_warm) { chain(scaleOffset(1.10f, 1.02f, 0.88f, 8f, 4f, -6f), saturate(1.1f)) },
+    FilterPreset(R.string.edit_filter_cool) { chain(scaleOffset(0.90f, 1.0f, 1.12f, -4f, 2f, 10f), saturate(0.95f)) },
+    FilterPreset(R.string.edit_filter_matte) { chain(saturate(0.85f), scaleOffset(0.82f, 0.82f, 0.82f, 32f, 30f, 34f)) },
+    FilterPreset(R.string.edit_filter_vintage, vignette = 0.35f) {
         chain(saturate(0.7f), scaleOffset(1.0f, 0.95f, 0.78f, 24f, 16f, 6f), contrast(0.95f))
     },
-    FilterPreset("Drama", vignette = 0.45f) { chain(contrast(1.35f), saturate(0.75f), scaleOffset(1f, 1f, 1f, -10f, -10f, -10f)) },
-    FilterPreset("Chrom") { chain(contrast(1.2f), saturate(1.25f), scaleOffset(1.02f, 1f, 1.06f, 0f, 0f, 4f)) },
-    FilterPreset("Pastell") { chain(saturate(0.75f), scaleOffset(0.85f, 0.85f, 0.85f, 38f, 34f, 42f)) },
-    FilterPreset("S/W") { saturate(0f) },
-    FilterPreset("Noir", vignette = 0.4f) { chain(saturate(0f), contrast(1.45f)) },
-    FilterPreset("Sepia") {
+    FilterPreset(R.string.edit_filter_drama, vignette = 0.45f) { chain(contrast(1.35f), saturate(0.75f), scaleOffset(1f, 1f, 1f, -10f, -10f, -10f)) },
+    FilterPreset(R.string.edit_filter_chrome) { chain(contrast(1.2f), saturate(1.25f), scaleOffset(1.02f, 1f, 1.06f, 0f, 0f, 4f)) },
+    FilterPreset(R.string.edit_filter_pastel) { chain(saturate(0.75f), scaleOffset(0.85f, 0.85f, 0.85f, 38f, 34f, 42f)) },
+    FilterPreset(R.string.edit_filter_bw) { saturate(0f) },
+    FilterPreset(R.string.edit_filter_noir, vignette = 0.4f) { chain(saturate(0f), contrast(1.45f)) },
+    FilterPreset(R.string.edit_filter_sepia) {
         chain(
             saturate(0f),
             ColorMatrix(
@@ -144,8 +146,8 @@ val FILTERS: List<FilterPreset> = listOf(
             ),
         )
     },
-    FilterPreset("Lomo", vignette = 0.6f) { chain(contrast(1.25f), saturate(1.3f), scaleOffset(1.04f, 1.02f, 0.92f, 0f, 0f, 0f)) },
-    FilterPreset("Invertiert") {
+    FilterPreset(R.string.edit_filter_lomo, vignette = 0.6f) { chain(contrast(1.25f), saturate(1.3f), scaleOffset(1.04f, 1.02f, 0.92f, 0f, 0f, 0f)) },
+    FilterPreset(R.string.edit_filter_invert) {
         ColorMatrix(
             floatArrayOf(
                 -1f, 0f, 0f, 0f, 255f,

@@ -67,6 +67,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import io.github.carnager.peek.R
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.imePadding
@@ -184,14 +186,14 @@ fun DrawTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
                 if (m < 3 && mode >= 3 && width > 0.03f) width = 0.012f
                 mode = m
             }
-            FilledTonalIconToggleButton(checked = mode == 0, onCheckedChange = { pick(0) }) { Icon(Icons.Rounded.Brush, "Stift") }
-            FilledTonalIconToggleButton(checked = mode == 1, onCheckedChange = { pick(1) }) { Icon(Icons.Rounded.Highlight, "Marker") }
-            FilledTonalIconToggleButton(checked = mode == 2, onCheckedChange = { pick(2) }) { Icon(Icons.Rounded.ArrowOutward, "Pfeil") }
-            FilledTonalIconToggleButton(checked = mode == 3, onCheckedChange = { pick(3) }) { Icon(Icons.Rounded.GridOn, "Verpixeln") }
-            FilledTonalIconToggleButton(checked = mode == 4, onCheckedChange = { pick(4) }) { Icon(Icons.Rounded.BlurOn, "Weichzeichnen") }
+            FilledTonalIconToggleButton(checked = mode == 0, onCheckedChange = { pick(0) }) { Icon(Icons.Rounded.Brush, stringResource(R.string.edit_draw_pen)) }
+            FilledTonalIconToggleButton(checked = mode == 1, onCheckedChange = { pick(1) }) { Icon(Icons.Rounded.Highlight, stringResource(R.string.edit_draw_marker)) }
+            FilledTonalIconToggleButton(checked = mode == 2, onCheckedChange = { pick(2) }) { Icon(Icons.Rounded.ArrowOutward, stringResource(R.string.edit_draw_arrow)) }
+            FilledTonalIconToggleButton(checked = mode == 3, onCheckedChange = { pick(3) }) { Icon(Icons.Rounded.GridOn, stringResource(R.string.edit_draw_pixelate)) }
+            FilledTonalIconToggleButton(checked = mode == 4, onCheckedChange = { pick(4) }) { Icon(Icons.Rounded.BlurOn, stringResource(R.string.edit_draw_blur)) }
             Spacer(Modifier.weight(1f))
             IconButton(onClick = { if (vm.strokes.isNotEmpty()) vm.strokes.removeAt(vm.strokes.lastIndex) }, enabled = vm.strokes.isNotEmpty()) {
-                Icon(Icons.AutoMirrored.Rounded.Undo, "Letzten Strich entfernen")
+                Icon(Icons.AutoMirrored.Rounded.Undo, stringResource(R.string.edit_draw_remove_last))
             }
         }
         androidx.compose.animation.AnimatedVisibility(visible = mode < 3) {
@@ -199,7 +201,7 @@ fun DrawTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         }
         androidx.compose.animation.AnimatedVisibility(visible = mode >= 3) {
             Text(
-                if (mode == 3) "Verpixeln: über Gesichter, Namen oder Kennzeichen malen" else "Weichzeichnen: über die Stelle malen",
+                stringResource(if (mode == 3) R.string.edit_draw_pixelate_hint else R.string.edit_draw_blur_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
@@ -213,7 +215,7 @@ fun DrawTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             }
             Slider(value = width, onValueChange = { width = it }, valueRange = 0.003f..0.12f, modifier = Modifier.weight(1f))
         }
-        ToolActions(title = "Zeichnen", onCancel = vm::closeTool, onApply = vm::applyOverlays)
+        ToolActions(title = stringResource(R.string.edit_tool_draw), onCancel = vm::closeTool, onApply = vm::applyOverlays)
         }
     }
 }
@@ -244,7 +246,7 @@ fun TextTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         scope.launch {
             val f = withContext(Dispatchers.IO) { Fonts.import(ctx, uri) }
             if (f == null) {
-                Toast.makeText(ctx, "Keine gültige Schriftdatei", Toast.LENGTH_SHORT).show()
+                Toast.makeText(ctx, ctx.getString(R.string.edit_text_invalid_font), Toast.LENGTH_SHORT).show()
             } else {
                 fonts = Fonts.all(ctx)
                 vm.lastFontId = f.id
@@ -325,10 +327,10 @@ fun TextTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             FilledTonalButton(onClick = { creating = true }) {
                 Icon(Icons.Rounded.Add, null)
                 Spacer(Modifier.width(4.dp))
-                Text("Text")
+                Text(stringResource(R.string.edit_tool_text))
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { editing = selected }, enabled = selected != null) { Icon(Icons.Rounded.Edit, "Text ändern") }
+            IconButton(onClick = { editing = selected }, enabled = selected != null) { Icon(Icons.Rounded.Edit, stringResource(R.string.edit_text_edit)) }
             IconButton(
                 onClick = { selected?.let { update(it.copy(align = TextAlign.entries[(it.align.ordinal + 1) % 3])) } },
                 enabled = selected != null,
@@ -339,18 +341,18 @@ fun TextTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
                         TextAlign.RIGHT -> Icons.AutoMirrored.Rounded.FormatAlignRight
                         else -> Icons.Rounded.FormatAlignCenter
                     },
-                    "Ausrichtung",
+                    stringResource(R.string.edit_text_alignment),
                 )
             }
             FilledTonalIconToggleButton(
                 checked = selected?.bold == true,
                 onCheckedChange = { b -> selected?.let { update(it.copy(bold = b)) } },
                 enabled = selected != null,
-            ) { Icon(Icons.Rounded.FormatBold, "Fett") }
+            ) { Icon(Icons.Rounded.FormatBold, stringResource(R.string.edit_text_bold)) }
             IconButton(
                 onClick = { selected?.let { vm.textLayers.remove(it); vm.selectedText = null } },
                 enabled = selected != null,
-            ) { Icon(Icons.Rounded.Delete, "Text entfernen") }
+            ) { Icon(Icons.Rounded.Delete, stringResource(R.string.edit_text_remove)) }
         }
 
         // Style
@@ -360,7 +362,7 @@ fun TextTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         ) {
             val current = selected?.style ?: vm.lastTextStyle
             TextStyleMode.entries.forEach { m ->
-                PillChip(selected = m == current, label = m.label) {
+                PillChip(selected = m == current, label = stringResource(m.label)) {
                     vm.lastTextStyle = m
                     selected?.let { update(it.copy(style = m)) }
                 }
@@ -395,7 +397,7 @@ fun TextTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        f.label,
+                        if (f.labelRes != 0) stringResource(f.labelRes) else f.label,
                         fontFamily = family,
                         fontSize = 18.sp,
                         maxLines = 1,
@@ -412,7 +414,7 @@ fun TextTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
-                        Text(" Schrift importieren", maxLines = 1)
+                        Text(stringResource(R.string.edit_text_import_font), maxLines = 1)
                     }
                 }
             }
@@ -423,7 +425,7 @@ fun TextTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             selected?.let { update(it.copy(color = c)) }
         }
 
-        ToolActions(title = "Text", onCancel = vm::closeTool, onApply = { vm.selectedText = null; vm.applyOverlays() })
+        ToolActions(title = stringResource(R.string.edit_tool_text), onCancel = vm::closeTool, onApply = { vm.selectedText = null; vm.applyOverlays() })
         }
     }
 
@@ -477,9 +479,9 @@ private fun TextInputDialog(initial: String, fontId: String, color: Int, onDismi
             Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.78f)).systemBarsPadding().imePadding(),
         ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onDismiss) { Text("Abbrechen", color = Color.White) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.edit_cancel), color = Color.White) }
                 Spacer(Modifier.weight(1f))
-                androidx.compose.material3.Button(onClick = { onConfirm(text.text) }) { Text("Fertig") }
+                androidx.compose.material3.Button(onClick = { onConfirm(text.text) }) { Text(stringResource(R.string.edit_done)) }
             }
             androidx.compose.foundation.text.BasicTextField(
                 value = text,
@@ -498,7 +500,7 @@ private fun TextInputDialog(initial: String, fontId: String, color: Int, onDismi
                 decorationBox = { inner ->
                     Box(contentAlignment = Alignment.Center) {
                         if (text.text.isEmpty()) {
-                            Text("Text eingeben", color = Color.White.copy(alpha = 0.4f), fontFamily = family, fontSize = 36.sp)
+                            Text(stringResource(R.string.edit_text_hint), color = Color.White.copy(alpha = 0.4f), fontFamily = family, fontSize = 36.sp)
                         }
                         inner()
                     }

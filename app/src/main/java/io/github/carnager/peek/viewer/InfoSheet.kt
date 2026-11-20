@@ -25,6 +25,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import io.github.carnager.peek.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -161,7 +163,7 @@ fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(item.date)) + " Uhr",
+                stringResource(R.string.view_time, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(item.date))),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -174,14 +176,14 @@ fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
             overflow = TextOverflow.MiddleEllipsis,
             modifier = Modifier.padding(top = 6.dp),
         )
-        item.owner?.let { Text("Foto von $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp)) }
+        item.owner?.let { Text(stringResource(R.string.view_photo_by, it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp)) }
 
         // Caption: shown when there is one; editable where the photo lives on trunk.
         var editCaption by remember { mutableStateOf(false) }
         val caption = meta.caption
         if (caption != null || onCaption != null) {
             Text(
-                caption ?: "Beschreibung hinzufügen",
+                caption ?: stringResource(R.string.view_add_caption),
                 style = if (caption != null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                 color = if (caption != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 12.dp).then(
@@ -193,15 +195,15 @@ fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
             var text by remember { mutableStateOf(caption ?: "") }
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { editCaption = false },
-                title = { Text("Beschreibung") },
+                title = { Text(stringResource(R.string.view_caption)) },
                 text = {
                     androidx.compose.material3.OutlinedTextField(
                         value = text, onValueChange = { text = it },
                         modifier = Modifier.fillMaxWidth(), minLines = 2,
                     )
                 },
-                confirmButton = { androidx.compose.material3.TextButton(onClick = { onCaption(text.trim()); editCaption = false }) { Text("Speichern") } },
-                dismissButton = { androidx.compose.material3.TextButton(onClick = { editCaption = false }) { Text("Abbrechen") } },
+                confirmButton = { androidx.compose.material3.TextButton(onClick = { onCaption(text.trim()); editCaption = false }) { Text(stringResource(R.string.view_save)) } },
+                dismissButton = { androidx.compose.material3.TextButton(onClick = { editCaption = false }) { Text(stringResource(R.string.view_cancel)) } },
             )
         }
 
@@ -210,9 +212,9 @@ fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
             if (item.width > 0) {
                 Fact(Icons.Rounded.AspectRatio, "%.1f MP".format(item.width * item.height / 1e6), "${item.width} × ${item.height}")
             }
-            if (item.isVideo && item.duration > 0) Fact(Icons.Rounded.PlayCircle, formatDuration(item.duration), "Länge")
+            if (item.isVideo && item.duration > 0) Fact(Icons.Rounded.PlayCircle, formatDuration(item.duration), stringResource(R.string.view_duration))
             if (item.size > 0) Fact(Icons.Rounded.Storage, Formatter.formatShortFileSize(ctx, item.size), item.mimeType.substringAfter('/').uppercase())
-            item.path?.let { Fact(Icons.Rounded.Folder, it.substringAfterLast('/').ifBlank { it }, "Ordner") }
+            item.path?.let { Fact(Icons.Rounded.Folder, it.substringAfterLast('/').ifBlank { it }, stringResource(R.string.view_folder)) }
         }
 
         // Camera.
@@ -221,17 +223,19 @@ fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconBadge(Icons.Rounded.PhotoCamera)
                     Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                        Text(meta.camera ?: "Kamera", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        val lens = meta.lens ?: meta.focal35?.let { "$it mm Kleinbild-Äquivalent" }
+                        Text(meta.camera ?: stringResource(R.string.view_camera), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        val focal35 = meta.focal35?.let { stringResource(R.string.view_focal_35mm, it) }
+                        val lens = meta.lens ?: focal35
                         lens?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
+                val flash = stringResource(R.string.view_flash)
                 val chips = buildList {
                     meta.aperture?.let { add("ƒ/" + "%.1f".format(it).removeSuffix(",0").removeSuffix(".0")) }
                     meta.exposure?.let { add(if (it < 1) "1/${(1 / it).roundToInt()} s" else "%.1f s".format(it)) }
                     meta.iso?.let { add("ISO $it") }
                     meta.focal?.let { add("%.1f mm".format(it).replace(",0 ", " ").replace(".0 ", " ")) }
-                    if (meta.flash == true) add("Blitz")
+                    if (meta.flash == true) add(flash)
                 }
                 if (chips.isNotEmpty()) {
                     Row(Modifier.padding(top = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -260,7 +264,7 @@ fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconBadge(Icons.Rounded.Place)
                     Column(Modifier.padding(start = 14.dp)) {
-                        Text(place ?: "Aufnahmeort", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(place ?: stringResource(R.string.view_location), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         Text(
                             "%.5f, %.5f".format(Locale.ROOT, lat, lon) + (meta.altitude?.let { " · %.0f m".format(it) } ?: ""),
                             style = MaterialTheme.typography.bodySmall,
@@ -277,15 +281,15 @@ fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
                 ) {
                     IconBadge(Icons.Rounded.LocationOff)
                     Column(Modifier.padding(start = 14.dp)) {
-                        Text("Aufnahmeort ausgeblendet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                        Text("Tippen, um peek Standortdaten in Fotos lesen zu lassen.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.view_location_hidden), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.view_location_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         }
 
         meta.software?.let {
-            Text("Bearbeitet mit $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp, start = 4.dp))
+            Text(stringResource(R.string.view_edited_with, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp, start = 4.dp))
         }
     }
 }

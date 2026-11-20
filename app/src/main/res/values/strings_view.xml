@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher label of the editor's intent filter (manifest). -->
+    <string name="editor_label">Edit with peek</string>
+
+    <!-- Editor: activity and view model -->
+    <string name="edit_no_image_received">No image received</string>
+    <string name="edit_saved_as_copy">Saved as a copy</string>
+    <string name="edit_saved_to_trunk">Saved to trunk. The original is kept.</string>
+    <string name="edit_uploaded_copy_to_trunk">Uploaded to trunk as a copy</string>
+    <string name="edit_no_write_permission">No permission to change the original. Please save as a copy.</string>
+    <string name="edit_original_replaced">Original replaced</string>
+    <string name="edit_load_failed">Couldn\'t load the image: %1$s</string>
+    <string name="edit_out_of_memory">Not enough memory for this step</string>
+    <string name="edit_no_image">No image</string>
+    <string name="edit_save_failed">Couldn\'t save</string>
+    <string name="edit_format_not_writable">Can\'t write %1$s files</string>
+
+    <!-- Editor: tools -->
+    <string name="edit_tool_crop">Crop</string>
+    <string name="edit_tool_adjust">Adjust</string>
+    <string name="edit_tool_filter">Filters</string>
+    <string name="edit_tool_draw">Draw</string>
+    <string name="edit_tool_text">Text</string>
+    <string name="edit_tool_resize">Resize</string>
+
+    <!-- Editor: main screen -->
+    <string name="edit_close">Close</string>
+    <string name="edit_undo">Undo</string>
+    <string name="edit_redo">Redo</string>
+    <string name="edit_save">Save</string>
+    <string name="edit_original">Original</string>
+    <string name="edit_ok">OK</string>
+    <string name="edit_discard_title">Discard changes?</string>
+    <string name="edit_discard">Discard</string>
+    <string name="edit_keep_editing">Keep editing</string>
+    <string name="edit_cancel">Cancel</string>
+    <string name="edit_apply">Apply</string>
+    <string name="edit_done">Done</string>
+
+    <!-- Editor: resize dialog -->
+    <string name="edit_resize_title">Resize</string>
+    <string name="edit_resize_current">Current: %1$d × %2$d</string>
+    <string name="edit_width">Width</string>
+    <string name="edit_height">Height</string>
+    <string name="edit_lock_aspect">Lock aspect ratio</string>
+    <string name="edit_resize_percent">%1$d%%</string>
+    <string name="edit_too_large">Too large for memory</string>
+
+    <!-- Editor: save sheet -->
+    <string name="edit_downscaled">The original (%1$d × %2$d) was scaled down for editing.</string>
+    <string name="edit_quality">Quality</string>
+    <string name="edit_save_to_trunk">Save to trunk</string>
+    <string name="edit_upload_copy_to_trunk">Upload a copy to trunk</string>
+    <string name="edit_save_on_phone">Save on phone</string>
+    <string name="edit_trunk_keeps_original">trunk keeps the original. You can discard the edit later from “More” in the viewer.</string>
+    <string name="edit_save_as_copy">Save as copy</string>
+    <string name="edit_replace_original">Replace original</string>
+    <string name="edit_replace_needs_format">Replacing the original only works in its original format (%1$s).</string>
+    <string name="edit_replace_needs_format_unknown">Replacing the original only works in its original format.</string>
+
+    <!-- Editor: crop -->
+    <string name="edit_aspect_free">Free</string>
+    <string name="edit_rotate_left">Rotate left</string>
+    <string name="edit_rotate_right">Rotate right</string>
+    <string name="edit_flip_horizontal">Flip horizontally</string>
+    <string name="edit_flip_vertical">Flip vertically</string>
+    <string name="edit_reset">Reset</string>
+
+    <!-- Editor: adjustments -->
+    <string name="edit_adjust_brightness">Brightness</string>
+    <string name="edit_adjust_contrast">Contrast</string>
+    <string name="edit_adjust_highlights">Highlights</string>
+    <string name="edit_adjust_shadows">Shadows</string>
+    <string name="edit_adjust_saturation">Saturation</string>
+    <string name="edit_adjust_warmth">Warmth</string>
+    <string name="edit_adjust_tint">Tint</string>
+    <string name="edit_adjust_fade">Fade</string>
+    <string name="edit_adjust_sharpen">Sharpen</string>
+    <string name="edit_adjust_vignette">Vignette</string>
+
+    <!-- Editor: filter presets -->
+    <string name="edit_filter_vivid">Vivid</string>
+    <string name="edit_filter_warm">Warm</string>
+    <string name="edit_filter_cool">Cool</string>
+    <string name="edit_filter_matte">Matte</string>
+    <string name="edit_filter_vintage">Vintage</string>
+    <string name="edit_filter_drama">Drama</string>
+    <string name="edit_filter_chrome">Chrome</string>
+    <string name="edit_filter_pastel">Pastel</string>
+    <string name="edit_filter_bw">B&amp;W</string>
+    <string name="edit_filter_noir">Noir</string>
+    <string name="edit_filter_sepia">Sepia</string>
+    <string name="edit_filter_lomo">Lomo</string>
+    <string name="edit_filter_invert">Invert</string>
+
+    <!-- Editor: draw -->
+    <string name="edit_draw_pen">Pen</string>
+    <string name="edit_draw_marker">Marker</string>
+    <string name="edit_draw_arrow">Arrow</string>
+    <string name="edit_draw_pixelate">Pixelate</string>
+    <string name="edit_draw_blur">Blur</string>
+    <string name="edit_draw_remove_last">Remove last stroke</string>
+    <string name="edit_draw_pixelate_hint">Pixelate: paint over faces, names or license plates</string>
+    <string name="edit_draw_blur_hint">Blur: paint over the area</string>
+
+    <!-- Editor: text -->
+    <string name="edit_text_invalid_font">Not a valid font file</string>
+    <string name="edit_text_edit">Edit text</string>
+    <string name="edit_text_alignment">Alignment</string>
+    <string name="edit_text_bold">Bold</string>
+    <string name="edit_text_remove">Remove text</string>
+    <string name="edit_text_import_font">" Import font"</string>
+    <string name="edit_text_hint">Enter text</string>
+    <string name="edit_style_plain">Plain</string>
+    <string name="edit_style_shadow">Shadow</string>
+    <string name="edit_style_outline">Outline</string>
+    <string name="edit_style_box">Box</string>
+    <string name="edit_style_soft_box">Light box</string>
+    <string name="edit_font_typewriter">Typewriter</string>
+
+    <!-- Viewer -->
+    <string name="view_back">Back</string>
+    <string name="view_position">%1$d of %2$d</string>
+    <string name="view_more">More</string>
+    <string name="view_open_with">Open with</string>
+    <string name="view_send_to_person">Send to someone</string>
+    <string name="view_create_link">Create link</string>
+    <string name="view_add_to_album">Add to album</string>
+    <string name="view_revert_edit">Discard edit</string>
+    <string name="view_set_as">Set as</string>
+    <string name="view_share">Share</string>
+    <string name="view_edit">Edit</string>
+    <string name="view_delete">Delete</string>
+    <string name="view_info">Info</string>
+    <string name="view_favorite_add">Add to favorites</string>
+    <string name="view_favorite_remove">Remove from favorites</string>
+    <string name="view_play">Play</string>
+    <string name="view_pause">Pause</string>
+    <string name="view_mute">Mute</string>
+    <string name="view_unmute">Unmute</string>
+
+    <!-- Viewer: info sheet -->
+    <string name="view_time">%1$s</string>
+    <string name="view_photo_by">Photo by %1$s</string>
+    <string name="view_add_caption">Add a description</string>
+    <string name="view_caption">Description</string>
+    <string name="view_save">Save</string>
+    <string name="view_cancel">Cancel</string>
+    <string name="view_duration">Duration</string>
+    <string name="view_folder">Folder</string>
+    <string name="view_camera">Camera</string>
+    <string name="view_focal_35mm">%1$d mm (35 mm equiv.)</string>
+    <string name="view_flash">Flash</string>
+    <string name="view_location">Location</string>
+    <string name="view_location_hidden">Location hidden</string>
+    <string name="view_location_hint">Tap to let peek read location data in photos.</string>
+    <string name="view_edited_with">Edited with %1$s</string>
+</resources>

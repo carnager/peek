@@ -9,13 +9,18 @@ import android.graphics.RectF
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import androidx.annotation.StringRes
+import io.github.carnager.peek.R
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-enum class TextStyleMode(val label: String) { PLAIN("Normal"), SHADOW("Schatten"), OUTLINE("Kontur"), BOX("Box"), SOFT_BOX("Box hell") }
+enum class TextStyleMode(@StringRes val label: Int) {
+    PLAIN(R.string.edit_style_plain), SHADOW(R.string.edit_style_shadow), OUTLINE(R.string.edit_style_outline),
+    BOX(R.string.edit_style_box), SOFT_BOX(R.string.edit_style_soft_box),
+}
 
 enum class TextAlign(val layout: Layout.Alignment) {
     LEFT(Layout.Alignment.ALIGN_NORMAL),

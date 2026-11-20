@@ -33,6 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
+import io.github.carnager.peek.R
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
@@ -142,11 +145,12 @@ fun ImageStage(
 
 private enum class Handle { TL, T, TR, R, BR, B, BL, L, MOVE }
 
-private class AspectOption(val label: String, val ratio: Float?, val original: Boolean = false)
+/** [label] is shown as is; [labelRes], when set, is a translated label used instead. */
+private class AspectOption(val label: String, val ratio: Float?, val original: Boolean = false, @StringRes val labelRes: Int = 0)
 
 private val ASPECTS = listOf(
-    AspectOption("Frei", null),
-    AspectOption("Original", null, original = true),
+    AspectOption("", null, labelRes = R.string.edit_aspect_free),
+    AspectOption("", null, original = true, labelRes = R.string.edit_original),
     AspectOption("1:1", 1f),
     AspectOption("4:3", 4f / 3f),
     AspectOption("3:4", 3f / 4f),
@@ -344,7 +348,7 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ASPECTS.forEachIndexed { i, a ->
-                PillChip(selected = i == aspectIndex, label = a.label) { aspectIndex = i; resetCrop() }
+                PillChip(selected = i == aspectIndex, label = if (a.labelRes != 0) stringResource(a.labelRes) else a.label) { aspectIndex = i; resetCrop() }
             }
         }
         AngleDial(
@@ -355,23 +359,23 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             IconButton(onClick = { vm.zoom.reset(); turns = (turns + 3) % 4; crop = RectF(0f, 0f, 1f, 1f); aspectIndex = 0 }) {
-                Icon(Icons.AutoMirrored.Rounded.RotateLeft, "Links drehen")
+                Icon(Icons.AutoMirrored.Rounded.RotateLeft, stringResource(R.string.edit_rotate_left))
             }
             IconButton(onClick = { vm.zoom.reset(); turns = (turns + 1) % 4; crop = RectF(0f, 0f, 1f, 1f); aspectIndex = 0 }) {
-                Icon(Icons.AutoMirrored.Rounded.RotateRight, "Rechts drehen")
+                Icon(Icons.AutoMirrored.Rounded.RotateRight, stringResource(R.string.edit_rotate_right))
             }
             IconButton(onClick = { flipH = !flipH; crop = RectF(1 - crop.right, crop.top, 1 - crop.left, crop.bottom) }) {
-                Icon(Icons.Rounded.Flip, "Horizontal spiegeln")
+                Icon(Icons.Rounded.Flip, stringResource(R.string.edit_flip_horizontal))
             }
             IconButton(onClick = { flipV = !flipV; crop = RectF(crop.left, 1 - crop.bottom, crop.right, 1 - crop.top) }) {
-                Icon(Icons.Rounded.Flip, "Vertikal spiegeln", Modifier.rotate(90f))
+                Icon(Icons.Rounded.Flip, stringResource(R.string.edit_flip_vertical), Modifier.rotate(90f))
             }
             IconButton(onClick = { turns = 0; flipH = false; flipV = false; angle = 0f; aspectIndex = 0; crop = RectF(0f, 0f, 1f, 1f) }) {
-                Icon(Icons.Rounded.RestartAlt, "Zurücksetzen")
+                Icon(Icons.Rounded.RestartAlt, stringResource(R.string.edit_reset))
             }
         }
         ToolActions(
-            title = "Zuschneiden",
+            title = stringResource(R.string.edit_tool_crop),
             onCancel = vm::closeTool,
             onApply = {
                 val c = RectF(crop)

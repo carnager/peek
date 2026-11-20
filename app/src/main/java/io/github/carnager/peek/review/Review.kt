@@ -100,7 +100,7 @@ object Review {
     }
 
     fun createChannel(ctx: Context) {
-        val ch = NotificationChannel(CHANNEL, "Abendliche Durchsicht", NotificationManager.IMPORTANCE_DEFAULT)
+        val ch = NotificationChannel(CHANNEL, ctx.getString(R.string.review_channel), NotificationManager.IMPORTANCE_DEFAULT)
         ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
     }
 
@@ -150,8 +150,8 @@ object Review {
         )
         val n = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_upload)
-            .setContentTitle(if (count == 1) "1 neues Bild" else "$count neue Bilder")
-            .setContentText("Kurz durchsehen: behalten, löschen, zu trunk?")
+            .setContentTitle(ctx.resources.getQuantityString(R.plurals.review_notify_title, count, count))
+            .setContentText(ctx.getString(R.string.review_notify_text))
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()

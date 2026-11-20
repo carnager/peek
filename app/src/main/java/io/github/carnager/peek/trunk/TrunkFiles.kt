@@ -3,6 +3,7 @@ package io.github.carnager.peek.trunk
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
+import io.github.carnager.peek.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -27,7 +28,7 @@ object TrunkFiles {
         if (!file.exists() || file.length() != asset.size) {
             val tmp = File(file.path + ".part")
             TrunkClient.http.newCall(Request.Builder().url(TrunkAccount.fileUrl(asset)).build()).execute().use { r ->
-                if (!r.isSuccessful) throw TrunkException(r.code, "Original konnte nicht geladen werden (HTTP ${r.code})")
+                if (!r.isSuccessful) throw TrunkException(r.code, ctx.getString(R.string.trunk_error_original, r.code))
                 tmp.outputStream().use { out -> r.body!!.byteStream().copyTo(out) }
             }
             tmp.renameTo(file)

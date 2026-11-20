@@ -54,6 +54,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import io.github.carnager.peek.R
 import io.github.carnager.peek.ui.bounceClick
 import io.github.carnager.peek.ui.brandFont
 import io.github.carnager.peek.viewer.ImageViewer
@@ -288,7 +291,7 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
         AddToAlbumSheet(vm, ids) { vm.addToAlbum = null }
     }
     viewerSend?.let { SendSheet(vm, it) { viewerSend = null } }
-    viewerLink?.let { LinkSheet(vm, null, it, "Foto") { viewerLink = null } }
+    viewerLink?.let { LinkSheet(vm, null, it, stringResource(R.string.gallery_link_default_photo)) { viewerLink = null } }
 }
 
 /** Where the viewer shows [image] when it is fitted to the screen. */
@@ -341,7 +344,7 @@ private fun TabBar(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>) {
                         null,
                     )
                 },
-                label = { Text(t.label) },
+                label = { Text(stringResource(t.label)) },
             )
         }
     }
@@ -355,11 +358,11 @@ internal fun RootActions(vm: GalleryViewModel) {
         val pending = vm.reviewPending.size
         IconButton(onClick = vm::startReview) {
             BadgedBox(badge = { if (pending > 0) Badge { Text(if (pending > 99) "99+" else "$pending") } }) {
-                Icon(Icons.Rounded.Checklist, "Neue Bilder durchsehen")
+                Icon(Icons.Rounded.Checklist, stringResource(R.string.gallery_review_new))
             }
         }
     }
-    IconButton(onClick = { vm.settingsOpen = true }) { Icon(Icons.Rounded.Settings, "Einstellungen") }
+    IconButton(onClick = { vm.settingsOpen = true }) { Icon(Icons.Rounded.Settings, stringResource(R.string.gallery_settings)) }
 }
 
 /** Tabs that are not a photo grid: the folders, and trunk while it is not connected. */
@@ -395,11 +398,11 @@ private fun AlbumsScreen(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>, t
             if (t == Tab.Trunk) {
                 item(key = "trunk", span = ::full) { TrunkCard(vm, null) { connecting = true } }
                 item(key = "trunkIntro", span = ::full) {
-                    Hint("trunk ist dein eigener Server für Fotos und Videos: Sicherung, Alben, Teilen, auf allen Geräten. Verbinde peek oben mit deinem trunk.")
+                    Hint(stringResource(R.string.gallery_trunk_intro))
                 }
             } else {
                 if (vm.folders.isEmpty()) {
-                    item(key = "foldersEmpty", span = ::full) { Hint("Noch keine Ordner mit Bildern auf dem Handy.") }
+                    item(key = "foldersEmpty", span = ::full) { Hint(stringResource(R.string.gallery_folders_empty)) }
                 }
                 items(vm.folders, key = { "f:" + it.bucketId }) { a ->
                     AlbumCard(a.name, a.count, a.cover, Modifier.animateItem()) { vm.open = Source.Folder(a.bucketId) }
@@ -413,10 +416,10 @@ private fun AlbumsScreen(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>, t
 /** A grid item across the whole row. */
 private fun full(s: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope) = GridItemSpan(s.maxLineSpan)
 
+@Composable
 private fun countLabel(n: Int) = when (n) {
-    0 -> "Leer"
-    1 -> "1 Bild"
-    else -> "$n Bilder"
+    0 -> stringResource(R.string.gallery_empty)
+    else -> pluralStringResource(R.plurals.gallery_photo_count, n, n)
 }
 
 /** Above the phone's photos: highlights, then peek's albums. */
@@ -440,15 +443,15 @@ private fun PhoneHeader(vm: GalleryViewModel, ops: MediaOps) {
                 item(key = "memories") { MemoriesTile(m) { vm.open = Source.Memories(false) } }
             }
             item(key = "fav") {
-                StripCard("Favoriten", countLabel(vm.favorites.size), vm.favorites.firstOrNull(), Icons.Rounded.Favorite, Color(0xFFFF4D6D)) { vm.open = Source.Favorites }
+                StripCard(stringResource(R.string.gallery_favorites), countLabel(vm.favorites.size), vm.favorites.firstOrNull(), Icons.Rounded.Favorite, Color(0xFFFF4D6D)) { vm.open = Source.Favorites }
             }
             item(key = "trash") {
-                StripCard("Papierkorb", countLabel(vm.trash.size), null, Icons.Rounded.DeleteOutline, MaterialTheme.colorScheme.onSurfaceVariant) { vm.open = Source.Trash }
+                StripCard(stringResource(R.string.gallery_trash), countLabel(vm.trash.size), null, Icons.Rounded.DeleteOutline, MaterialTheme.colorScheme.onSurfaceVariant) { vm.open = Source.Trash }
             }
         }
-        StripTitle("Alben") { NewButton { creating = true } }
+        StripTitle(stringResource(R.string.gallery_albums)) { NewButton { creating = true } }
         if (vm.userAlbums.isEmpty()) {
-            Box(Modifier.padding(horizontal = 13.dp)) { Hint("Sammle Bilder aus allen Ordnern in eigenen Alben. Die Dateien bleiben, wo sie sind.") }
+            Box(Modifier.padding(horizontal = 13.dp)) { Hint(stringResource(R.string.gallery_albums_hint)) }
         } else {
             val byId = remember(vm.images) { vm.images.associateBy { it.id } }
             Strip {
@@ -461,12 +464,12 @@ private fun PhoneHeader(vm: GalleryViewModel, ops: MediaOps) {
         }
         if (vm.loaded && vm.images.isEmpty()) {
             Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
-                Text("Noch keine Bilder auf dem Handy", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.gallery_no_photos_on_phone), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
     if (creating) {
-        NameDialog(title = "Neues Album", initial = "", confirm = "Anlegen", onDismiss = { creating = false }) { name ->
+        NameDialog(title = stringResource(R.string.gallery_new_album), initial = "", confirm = stringResource(R.string.gallery_create), onDismiss = { creating = false }) { name ->
             creating = false
             vm.open = Source.User(vm.createAlbum(name).id)
         }
@@ -482,7 +485,7 @@ private fun TrunkHeader(vm: GalleryViewModel) {
         if (upload != null) {
             val (done, total) = upload
             Column(Modifier.padding(horizontal = 13.dp, vertical = 6.dp)) {
-                Text(if (total > 0) "Lädt hoch: ${done + 1} von $total" else "Lädt hoch …", style = MaterialTheme.typography.labelLarge)
+                Text(if (total > 0) stringResource(R.string.gallery_uploading_progress, done + 1, total) else stringResource(R.string.gallery_uploading), style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(6.dp))
                 if (total > 0) {
                     LinearProgressIndicator(progress = { (done.toFloat() / total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
@@ -495,21 +498,21 @@ private fun TrunkHeader(vm: GalleryViewModel) {
             Strip { item(key = "memories") { MemoriesTile(m) { vm.open = Source.Memories(true) } } }
         }
         val albums = vm.trunkAlbums.filter { !it.direct }
-        StripTitle("Alben") { NewButton { creating = true } }
+        StripTitle(stringResource(R.string.gallery_albums)) { NewButton { creating = true } }
         if (albums.isEmpty()) {
-            Box(Modifier.padding(horizontal = 13.dp)) { Hint("Alben auf dem Server sehen alle deine Geräte. Wähle Bilder aus und tippe auf „Album“.") }
+            Box(Modifier.padding(horizontal = 13.dp)) { Hint(stringResource(R.string.gallery_trunk_albums_hint)) }
         } else {
             Strip { items(albums, key = { it.id }) { a -> TrunkStripCard(vm, a) } }
         }
         // Photos sent between people: "Von alice", "An bob".
         val direct = vm.trunkAlbums.filter { it.direct }
         if (direct.isNotEmpty()) {
-            StripTitle("Geteilt")
+            StripTitle(stringResource(R.string.gallery_shared))
             Strip { items(direct, key = { it.id }) { a -> TrunkStripCard(vm, a) } }
         }
     }
     if (creating) {
-        NameDialog(title = "Neues Album auf trunk", initial = "", confirm = "Anlegen", onDismiss = { creating = false }) { name ->
+        NameDialog(title = stringResource(R.string.gallery_new_trunk_album), initial = "", confirm = stringResource(R.string.gallery_create), onDismiss = { creating = false }) { name ->
             creating = false
             vm.trunkCreateAlbum(name) { id -> vm.open = Source.TrunkAlbum(id) }
         }
@@ -519,7 +522,7 @@ private fun TrunkHeader(vm: GalleryViewModel) {
 @Composable
 private fun TrunkStripCard(vm: GalleryViewModel, a: io.github.carnager.peek.trunk.RemoteAlbum) {
     val images = remember(a, vm.trunk, vm.trunkShared) { vm.trunkAlbumImages(a) }
-    StripCard(a.title, countLabel(images.size), images.firstOrNull(), Icons.Rounded.PhotoAlbum, shared = a.shared && !a.direct) {
+    StripCard(a.title(LocalContext.current), countLabel(images.size), images.firstOrNull(), Icons.Rounded.PhotoAlbum, shared = a.shared && !a.direct) {
         vm.open = Source.TrunkAlbum(a.id)
     }
 }
@@ -574,14 +577,14 @@ private fun StripCard(
         }
         if (shared) {
             Icon(
-                Icons.Rounded.Group, "Geteilt", tint = Color.White,
+                Icons.Rounded.Group, stringResource(R.string.gallery_shared), tint = Color.White,
                 modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(24.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).padding(4.dp),
             )
         }
     }
 }
 
-/** "Heute vor 2 Jahren": a wider card with a photo from back then, shown only on days that have one. */
+/** "2 years ago today": a wider card with a photo from back then, shown only on days that have one. */
 @Composable
 private fun MemoriesTile(m: OnThisDay, onClick: () -> Unit) {
     Box(
@@ -593,8 +596,8 @@ private fun MemoriesTile(m: OnThisDay, onClick: () -> Unit) {
         Thumb(m.cover, Modifier.fillMaxSize(), size = 600)
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.3f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))))
         Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text("Rückblick", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
-            Text(m.title, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(R.string.gallery_memories), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+            Text(m.title(LocalContext.current.resources), color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 listOfNotNull(m.place, countLabel(m.images.size)).joinToString(" · "),
                 color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -608,7 +611,7 @@ private fun NewButton(onClick: () -> Unit) {
     FilledTonalButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 14.dp)) {
         Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
         Spacer(Modifier.width(4.dp))
-        Text("Neu")
+        Text(stringResource(R.string.gallery_new))
     }
 }
 
@@ -626,15 +629,15 @@ private fun ManageMediaHint(onAllow: () -> Unit, onDismiss: () -> Unit) {
         Row(Modifier.padding(start = 16.dp, top = 14.dp, bottom = 10.dp, end = 4.dp)) {
             Icon(Icons.Rounded.AdminPanelSettings, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.padding(top = 2.dp))
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                Text("Ohne Rückfragen löschen und favorisieren", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.gallery_manage_media_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Erlaube peek die Medienverwaltung, dann fragt Android nicht bei jedem Papierkorb oder Herz nach.",
+                    stringResource(R.string.gallery_manage_media_text),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 2.dp),
                 )
-                TextButton(onClick = onAllow, contentPadding = PaddingValues(0.dp)) { Text("Erlauben") }
+                TextButton(onClick = onAllow, contentPadding = PaddingValues(0.dp)) { Text(stringResource(R.string.gallery_allow)) }
             }
-            IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, "Ausblenden") }
+            IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, stringResource(R.string.gallery_dismiss)) }
         }
     }
 }
@@ -663,11 +666,11 @@ private fun AlbumCard(name: String, count: Int, cover: MediaImage, modifier: Mod
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(if (count == 1) "1 Bild" else "$count Bilder", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+            Text(pluralStringResource(R.plurals.gallery_photo_count, count, count), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
         }
         if (shared) {
             Icon(
-                Icons.Rounded.Group, "Geteilt", tint = Color.White,
+                Icons.Rounded.Group, stringResource(R.string.gallery_shared), tint = Color.White,
                 modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(28.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).padding(5.dp),
             )
         }

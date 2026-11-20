@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -72,9 +73,9 @@ fun TrunkCard(vm: GalleryViewModel, upload: Pair<Int, Int>?, onClick: () -> Unit
                 Text("trunk", fontFamily = brandFont(), fontSize = 26.sp, color = OnNight)
                 Text(
                     when {
-                        !vm.trunkConnected -> "Mit deinem trunk-Server verbinden"
-                        vm.trunk.isEmpty() -> "Verbunden mit ${TrunkAccount.baseUrl?.substringAfter("://")}"
-                        else -> "${vm.trunk.size} auf ${TrunkAccount.baseUrl?.substringAfter("://")}"
+                        !vm.trunkConnected -> stringResource(R.string.gallery_trunk_card_connect)
+                        vm.trunk.isEmpty() -> stringResource(R.string.gallery_trunk_card_connected, TrunkAccount.baseUrl?.substringAfter("://").toString())
+                        else -> stringResource(R.string.gallery_trunk_card_count, vm.trunk.size, TrunkAccount.baseUrl?.substringAfter("://").toString())
                     },
                     color = OnNight.copy(alpha = 0.75f),
                     style = MaterialTheme.typography.bodySmall,
@@ -87,7 +88,7 @@ fun TrunkCard(vm: GalleryViewModel, upload: Pair<Int, Int>?, onClick: () -> Unit
             val (done, total) = upload
             Spacer(Modifier.height(12.dp))
             Text(
-                if (total > 0) "Lädt hoch: ${done + 1} von $total" else "Lädt hoch …",
+                if (total > 0) stringResource(R.string.gallery_uploading_progress, done + 1, total) else stringResource(R.string.gallery_uploading),
                 color = OnNight, style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.height(6.dp))
@@ -118,12 +119,12 @@ fun TrunkConnectDialog(vm: GalleryViewModel, onDone: () -> Unit) {
         onDismissRequest = { if (!busy) onDone() },
         shape = RoundedCornerShape(28.dp),
         icon = { Image(painterResource(R.drawable.mascot), null, Modifier.size(width = 72.dp, height = 50.dp)) },
-        title = { Text("Mit trunk verbinden") },
+        title = { Text(stringResource(R.string.gallery_connect_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = address, onValueChange = { address = it; error = null },
-                    label = { Text("Adresse") }, placeholder = { Text("fotos.example.org") },
+                    label = { Text(stringResource(R.string.gallery_connect_address)) }, placeholder = { Text("fotos.example.org") },
                     singleLine = true, shape = RoundedCornerShape(16.dp),
                     leadingIcon = { Icon(if (plain) Icons.Rounded.LockOpen else Icons.Rounded.Lock, null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
@@ -131,19 +132,19 @@ fun TrunkConnectDialog(vm: GalleryViewModel, onDone: () -> Unit) {
                 )
                 if (plain) {
                     Text(
-                        "Unverschlüsselt: nur im eigenen Netz verwenden.",
+                        stringResource(R.string.gallery_connect_unencrypted),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
                     )
                 }
                 OutlinedTextField(
                     value = user, onValueChange = { user = it; error = null },
-                    label = { Text("Name") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+                    label = { Text(stringResource(R.string.gallery_connect_name)) }, singleLine = true, shape = RoundedCornerShape(16.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = password, onValueChange = { password = it; error = null },
-                    label = { Text("Passwort") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+                    label = { Text(stringResource(R.string.gallery_connect_password)) }, singleLine = true, shape = RoundedCornerShape(16.dp),
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                     modifier = Modifier.fillMaxWidth(),
@@ -160,17 +161,21 @@ fun TrunkConnectDialog(vm: GalleryViewModel, onDone: () -> Unit) {
                 }
             }) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                else Text("Verbinden")
+                else Text(stringResource(R.string.gallery_connect))
             }
         },
-        dismissButton = { TextButton(onClick = onDone, enabled = !busy) { Text("Abbrechen") } },
+        dismissButton = { TextButton(onClick = onDone, enabled = !busy) { Text(stringResource(R.string.gallery_cancel)) } },
     )
 }
 
-private val LIMITS = listOf(0L to "Original", 4L shl 20 to "Höchstens 4 MB", 2L shl 20 to "Höchstens 2 MB", 1L shl 20 to "Höchstens 1 MB", 500L shl 10 to "Höchstens 500 KB")
+/** Upload limits with their size in words; null is the original. */
+private val LIMITS = listOf(0L to null, 4L shl 20 to "4 MB", 2L shl 20 to "2 MB", 1L shl 20 to "1 MB", 500L shl 10 to "500 KB")
+
+private fun limitLabel(ctx: android.content.Context, size: String?): String =
+    if (size == null) ctx.getString(R.string.gallery_limit_original) else ctx.getString(R.string.gallery_limit_max, size)
 
 /** The current upload limit in words, for the settings. */
-fun uploadLimitLabel(): String = LIMITS.firstOrNull { it.first == TrunkAccount.uploadLimit }?.second ?: "Original"
+fun uploadLimitLabel(ctx: android.content.Context): String = limitLabel(ctx, LIMITS.firstOrNull { it.first == TrunkAccount.uploadLimit }?.second)
 
 /** How big photos may be when they go up; bigger ones are sent as smaller JPEGs. */
 @Composable
@@ -180,16 +185,17 @@ fun UploadLimitDialog(onDone: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDone,
         shape = RoundedCornerShape(28.dp),
-        title = { Text("Upload-Größe") },
+        title = { Text(stringResource(R.string.gallery_limit_title)) },
         text = {
             Column {
                 Text(
-                    "Größere Fotos werden vor dem Hochladen als JPEG verkleinert. Datum, Kamera und Ort bleiben erhalten. Videos gehen immer im Original.",
+                    stringResource(R.string.gallery_limit_text),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
-                LIMITS.forEach { (bytes, label) ->
+                LIMITS.forEach { (bytes, size) ->
+                    val label = limitLabel(ctx, size)
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).bounceClick(pressedScale = 0.98f) {
                             current = bytes
@@ -203,6 +209,6 @@ fun UploadLimitDialog(onDone: () -> Unit) {
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDone) { Text("Fertig") } },
+        confirmButton = { TextButton(onClick = onDone) { Text(stringResource(R.string.gallery_done)) } },
     )
 }

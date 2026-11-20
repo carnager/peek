@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -75,10 +76,8 @@ class MainActivity : ComponentActivity() {
         pendingUpload = emptyList()
         if (images.isEmpty()) return
         io.github.carnager.peek.trunk.UploadWorker.enqueue(this, images)
-        vm.message = Message(if (images.size == 1) "1 Datei wird zu trunk hochgeladen" else "${images.size} Dateien werden zu trunk hochgeladen")
+        vm.message = Message(resources.getQuantityString(R.plurals.app_upload_started, images.size, images.size))
     }
-
-    private fun plural(n: Int) = if (n == 1) "1 Bild" else "$n Bilder"
 
     private val ops = object : MediaOps {
         override fun trash(images: List<MediaImage>) {
@@ -86,7 +85,7 @@ class MainActivity : ComponentActivity() {
             request(MediaStore.createTrashRequest(contentResolver, images.map { it.uri }, true)) {
                 vm.selection = emptySet()
                 vm.reload()
-                vm.message = Message("${plural(images.size)} im Papierkorb", "Rückgängig") { untrash(images, quiet = true) }
+                vm.message = Message(resources.getQuantityString(R.plurals.app_trashed, images.size, images.size), getString(R.string.app_undo)) { untrash(images, quiet = true) }
             }
         }
 
@@ -97,7 +96,7 @@ class MainActivity : ComponentActivity() {
             request(MediaStore.createTrashRequest(contentResolver, images.map { it.uri }, false)) {
                 vm.selection = emptySet()
                 vm.reload()
-                if (!quiet) vm.message = Message("${plural(images.size)} wiederhergestellt")
+                if (!quiet) vm.message = Message(resources.getQuantityString(R.plurals.app_restored, images.size, images.size))
             }
         }
 
@@ -106,7 +105,7 @@ class MainActivity : ComponentActivity() {
             request(MediaStore.createDeleteRequest(contentResolver, images.map { it.uri })) {
                 vm.selection = emptySet()
                 vm.reload()
-                vm.message = Message("${plural(images.size)} endgültig gelöscht")
+                vm.message = Message(resources.getQuantityString(R.plurals.app_deleted_forever, images.size, images.size))
             }
         }
 
@@ -250,7 +249,7 @@ private fun PermissionScreen(onRequest: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("peek braucht Zugriff auf deine Bilder, um sie anzuzeigen.", textAlign = TextAlign.Center)
-        Button(onClick = onRequest) { Text("Zugriff erlauben") }
+        Text(stringResource(R.string.app_permission_text), textAlign = TextAlign.Center)
+        Button(onClick = onRequest) { Text(stringResource(R.string.app_permission_allow)) }
     }
 }

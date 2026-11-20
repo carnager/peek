@@ -1,11 +1,13 @@
 package io.github.carnager.peek.editor
 
+import io.github.carnager.peek.R
 import io.github.carnager.peek.trunk.TrunkClient
 import io.github.carnager.peek.trunk.TrunkLibrary
 import io.github.carnager.peek.trunk.sha256
 import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +18,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Tool(val label: String) { CROP("Zuschneiden"), ADJUST("Anpassen"), FILTER("Filter"), DRAW("Zeichnen"), TEXT("Text"), RESIZE("Größe") }
+enum class Tool(@StringRes val label: Int) {
+    CROP(R.string.edit_tool_crop), ADJUST(R.string.edit_tool_adjust), FILTER(R.string.edit_tool_filter),
+    DRAW(R.string.edit_tool_draw), TEXT(R.string.edit_tool_text), RESIZE(R.string.edit_tool_resize),
+}
 
 class EditorViewModel(app: Application) : AndroidViewModel(app) {
     var source by mutableStateOf<SourceInfo?>(null)
@@ -69,7 +74,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
                 preview = withContext(Dispatchers.Default) { ImageOps.downscale(bmp, previewSide) }
                 originalPreview = preview
             } catch (e: Exception) {
-                error = "Bild konnte nicht geladen werden: ${e.message ?: e.javaClass.simpleName}"
+                error = str(R.string.edit_load_failed, e.message ?: e.javaClass.simpleName)
             } finally {
                 busy = false
             }
@@ -87,7 +92,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
                 if (out !== base) push(out)
                 tool = null
             } catch (e: OutOfMemoryError) {
-                error = "Zu wenig Speicher für diesen Schritt"
+                error = str(R.string.edit_out_of_memory)
             } catch (e: Exception) {
                 error = e.message ?: e.javaClass.simpleName
             } finally {
@@ -160,13 +165,13 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun saveCopy(format: SaveFormat, quality: Int): Uri {
-        val bmp = current ?: error("Kein Bild")
+        val bmp = current ?: error(str(R.string.edit_no_image))
         return ImageIO.saveCopy(getApplication(), bmp, source!!, format, quality)
     }
 
     /** Uploads the edit to trunk as a new photo next to the original. */
     suspend fun uploadToTrunk(format: SaveFormat, quality: Int, originalName: String, taken: Long) = withContext(Dispatchers.IO) {
-        val bmp = current ?: error("Kein Bild")
+        val bmp = current ?: error(str(R.string.edit_no_image))
         val file = ImageIO.encodeWithExif(getApplication(), bmp, source!!, format, quality)
         try {
             val name = originalName.substringBeforeLast('.') + "_edit." + format.ext
@@ -180,7 +185,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Saves the edit as the trunk photo's current version; trunk keeps the first upload. */
     suspend fun saveEditToTrunk(format: SaveFormat, quality: Int, id: Long) = withContext(Dispatchers.IO) {
-        val bmp = current ?: error("Kein Bild")
+        val bmp = current ?: error(str(R.string.edit_no_image))
         val file = ImageIO.encodeWithExif(getApplication(), bmp, source!!, format, quality)
         try {
             TrunkLibrary.put(getApplication(), TrunkClient.saveEdit(id, file, sha256(file), format.mime))
@@ -190,9 +195,11 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun overwrite(quality: Int) {
-        val bmp = current ?: error("Kein Bild")
+        val bmp = current ?: error(str(R.string.edit_no_image))
         ImageIO.overwrite(getApplication(), bmp, source!!, quality)
     }
+
+    private fun str(@StringRes id: Int, vararg args: Any): String = getApplication<Application>().getString(id, *args)
 
     fun runBusy(block: suspend () -> Unit) {
         viewModelScope.launch {

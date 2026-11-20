@@ -21,6 +21,8 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import io.github.carnager.peek.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -152,7 +154,7 @@ fun VideoPage(item: ViewerItem, isCurrent: Boolean, chrome: Boolean, onTap: () -
                         playing -> Icons.Rounded.Pause
                         else -> Icons.Rounded.PlayArrow
                     },
-                    if (playing) "Pause" else "Abspielen",
+                    stringResource(if (playing) R.string.view_pause else R.string.view_play),
                     tint = Color.White,
                     modifier = Modifier.size(44.dp),
                 )
@@ -186,7 +188,7 @@ fun VideoPage(item: ViewerItem, isCurrent: Boolean, chrome: Boolean, onTap: () -
                     muted = !muted
                     player?.volume = if (muted) 0f else 1f
                 }) {
-                    Icon(if (muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, if (muted) "Ton an" else "Ton aus", tint = Color.White)
+                    Icon(if (muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, stringResource(if (muted) R.string.view_unmute else R.string.view_mute), tint = Color.White)
                 }
             }
         }

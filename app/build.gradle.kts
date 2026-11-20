@@ -33,6 +33,12 @@ android {
         versionName = "0.13.0"
     }
 
+    // English by default, German when the phone (or peek's own language setting) says so. The
+    // list for Android's per-app language setting is generated from the resource folders.
+    androidResources {
+        generateLocaleConfig = true
+    }
+
     signingConfigs {
         create("release") {
             signingValue("PEEK_ANDROID_STORE_FILE")?.let { storeFile = file(it) }

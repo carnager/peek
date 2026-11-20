@@ -31,6 +31,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import io.github.carnager.peek.R
 import io.github.carnager.peek.ui.PillChip
 import io.github.carnager.peek.ui.ToolSheet
 import io.github.carnager.peek.ui.bounceClick
@@ -79,7 +81,8 @@ fun AdjustTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         ) {
             AdjustParam.entries.forEach { p ->
                 val v = p.get(adj)
-                PillChip(selected = p == param, label = if (v != 0f) "${p.label} ${(v * 100).roundToInt()}" else p.label) { param = p }
+                val label = stringResource(p.label)
+                PillChip(selected = p == param, label = if (v != 0f) "$label ${(v * 100).roundToInt()}" else label) { param = p }
             }
         }
         ValueSlider(
@@ -89,7 +92,7 @@ fun AdjustTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             onReset = { adj = param.set(adj, 0f) },
         )
         ToolActions(
-            title = "Anpassen",
+            title = stringResource(R.string.edit_tool_adjust),
             onCancel = vm::closeTool,
             onApply = {
                 val a = adj
@@ -136,14 +139,14 @@ fun FilterTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
                     ) {
                         Image(
                             bitmap = thumb,
-                            contentDescription = f.name,
+                            contentDescription = stringResource(f.name),
                             contentScale = ContentScale.Crop,
                             colorFilter = ColorFilter.colorMatrix(ColorMatrix(f.matrix(1f).array)),
                             modifier = Modifier.size(72.dp),
                         )
                     }
                     Text(
-                        f.name,
+                        stringResource(f.name),
                         style = MaterialTheme.typography.labelSmall,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -159,7 +162,7 @@ fun FilterTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             Box(Modifier.height(48.dp))
         }
         ToolActions(
-            title = "Filter",
+            title = stringResource(R.string.edit_tool_filter),
             onCancel = vm::closeTool,
             onApply = {
                 val p = preset

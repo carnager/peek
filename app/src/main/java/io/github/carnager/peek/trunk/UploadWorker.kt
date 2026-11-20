@@ -34,7 +34,7 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     private fun foreground(done: Int, total: Int, name: String?): ForegroundInfo {
         val n = NotificationCompat.Builder(applicationContext, CHANNEL)
             .setSmallIcon(R.drawable.ic_upload)
-            .setContentTitle(if (total > 0) "Lade zu trunk hoch: ${done + 1} von $total" else "Lade zu trunk hoch")
+            .setContentTitle(if (total > 0) applicationContext.getString(R.string.trunk_uploading_progress, done + 1, total) else applicationContext.getString(R.string.trunk_uploading))
             .setContentText(name)
             .setProgress(total, done, total == 0)
             .setOngoing(true)
@@ -74,13 +74,13 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
     private fun notifyDone(uploaded: Int, skipped: Int, failed: List<String>) {
         val text = buildList {
-            if (uploaded > 0) add("$uploaded hochgeladen")
-            if (skipped > 0) add("$skipped waren schon da")
-            if (failed.isNotEmpty()) add("${failed.size} fehlgeschlagen")
-        }.joinToString(", ").ifEmpty { "Nichts zu tun" }
+            if (uploaded > 0) add(applicationContext.getString(R.string.trunk_uploaded_count, uploaded))
+            if (skipped > 0) add(applicationContext.getString(R.string.trunk_skipped_count, skipped))
+            if (failed.isNotEmpty()) add(applicationContext.getString(R.string.trunk_failed_count, failed.size))
+        }.joinToString(", ").ifEmpty { applicationContext.getString(R.string.trunk_nothing_to_do) }
         val n = NotificationCompat.Builder(applicationContext, CHANNEL)
             .setSmallIcon(R.drawable.ic_upload)
-            .setContentTitle(if (failed.isEmpty()) "Upload zu trunk fertig" else "Upload zu trunk mit Fehlern")
+            .setContentTitle(applicationContext.getString(if (failed.isEmpty()) R.string.trunk_upload_finished else R.string.trunk_upload_failed))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText((listOf(text) + failed.take(5)).joinToString("\n")))
             .setAutoCancel(true)
@@ -101,7 +101,7 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         private const val NOTIFY_DONE_ID = 4202
 
         fun createChannel(ctx: Context) {
-            val ch = NotificationChannel(CHANNEL, "Upload zu trunk", NotificationManager.IMPORTANCE_LOW)
+            val ch = NotificationChannel(CHANNEL, ctx.getString(R.string.trunk_upload_channel), NotificationManager.IMPORTANCE_LOW)
             ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
         }
 
