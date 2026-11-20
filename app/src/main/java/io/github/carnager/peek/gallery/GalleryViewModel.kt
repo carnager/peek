@@ -139,6 +139,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
+                android.util.Log.w("peek-trunk", "sync failed", e)
                 message = Message("trunk nicht erreichbar: ${e.message ?: e.javaClass.simpleName}")
             } finally {
                 trunkSyncing = false

@@ -41,10 +41,14 @@ fun rememberUploadProgress(vm: GalleryViewModel): Pair<Int, Int>? {
     val ctx = LocalContext.current
     val infos by remember { WorkManager.getInstance(ctx).getWorkInfosForUniqueWorkFlow(UploadWorker.WORK) }.collectAsState(emptyList())
     val running = infos.firstOrNull { it.state == WorkInfo.State.RUNNING }
-    var wasRunning by remember { mutableStateOf(false) }
-    LaunchedEffect(running != null) {
-        if (running == null && wasRunning) vm.syncTrunk()
-        wasRunning = running != null
+    // Sync once for every finished batch, however short; a quick upload may never be seen running.
+    val handled = remember { HashSet<java.util.UUID>() }
+    LaunchedEffect(infos) {
+        val finished = infos.filter { it.state.isFinished }.map { it.id }
+        if (finished.any { it !in handled }) {
+            handled += finished
+            vm.syncTrunk()
+        }
     }
     return running?.let {
         val total = it.progress.getInt(UploadWorker.KEY_TOTAL, 0)

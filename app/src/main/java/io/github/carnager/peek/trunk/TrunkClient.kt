@@ -157,7 +157,8 @@ object TrunkClient {
         return if (text.isBlank()) JSONObject() else JSONObject(text)
     }
 
-    private fun call(req: Request): JSONObject = http.newCall(req).execute().use { it.bodyJson() }
+    /** API calls give up after 30 s, so a dead connection ends in an error instead of a spinner forever. */
+    private fun call(req: Request): JSONObject = http.newCall(req).apply { timeout().timeout(30, TimeUnit.SECONDS) }.execute().use { it.bodyJson() }
 
     /** Turns what people type ("192.168.0.13:8420", "photos.example.org/") into a base URL. */
     fun normalize(input: String): String {
