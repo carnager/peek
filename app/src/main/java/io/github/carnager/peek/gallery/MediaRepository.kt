@@ -29,7 +29,11 @@ data class MediaImage(
     val duration: Long = 0,
     /** Set for photos that live on the trunk server rather than on the phone. */
     val remote: io.github.carnager.peek.trunk.RemoteAsset? = null,
-)
+) {
+    /** Taken by the screenshot function rather than the camera. */
+    val isScreenshot: Boolean
+        get() = relativePath?.contains("Screenshots", ignoreCase = true) == true || name.startsWith("Screenshot", ignoreCase = true)
+}
 
 data class Album(
     val bucketId: Long,

@@ -333,7 +333,9 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
             }
             if (vm.images.isNotEmpty()) {
                 item(key = "all", span = { GridItemSpan(maxLineSpan) }) {
-                    AlbumCard("Alle Bilder", vm.images.size, vm.images.first(), aspect = 1.8f) { vm.open = Source.All }
+                    // Not a screenshot: a screenshot of peek itself would show this very card again.
+                    val cover = remember(vm.images) { vm.images.firstOrNull { !it.isScreenshot } ?: vm.images.first() }
+                    AlbumCard("Alle Bilder", vm.images.size, cover, aspect = 1.8f) { vm.open = Source.All }
                 }
             }
             item(key = "quick", span = { GridItemSpan(maxLineSpan) }) {
