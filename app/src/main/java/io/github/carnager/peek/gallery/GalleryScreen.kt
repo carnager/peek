@@ -179,9 +179,13 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
             }
         }
 
+        // Keep messages clear of whichever floating bar is showing: the viewer's actions or the
+        // selection pill (both about 60dp tall, 20dp above the navigation bar).
+        val barShown = vm.viewerIndex != null || vm.selection.isNotEmpty()
+        val snackbarLift by androidx.compose.animation.core.animateDpAsState(if (barShown) 96.dp else 16.dp, label = "snackbarLift")
         SnackbarHost(
             snackbar,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (vm.viewerIndex != null) 88.dp else 12.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = snackbarLift),
         ) { data ->
             Snackbar(data, shape = RoundedCornerShape(18.dp))
         }
