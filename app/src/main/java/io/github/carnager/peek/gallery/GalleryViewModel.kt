@@ -27,7 +27,12 @@ sealed interface Source {
     data class User(val id: String) : Source
     /** The library on the trunk server. */
     data object Trunk : Source
+    /** An album on the trunk server. */
+    data class TrunkAlbum(val id: Long) : Source
 }
+
+/** Shows photos from the trunk server, so actions go there. */
+val Source?.onTrunk: Boolean get() = this == Source.Trunk || this is Source.TrunkAlbum
 
 /** A short message with an optional action, shown as a snackbar. */
 data class Message(val text: String, val action: String? = null, val token: Long = System.nanoTime(), val onAction: (() -> Unit)? = null)
@@ -100,6 +105,8 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var trunkConnected by mutableStateOf(TrunkAccount.connected)
         private set
+    var trunkAlbums by mutableStateOf<List<io.github.carnager.peek.trunk.RemoteAlbum>>(emptyList())
+        private set
 
     private fun RemoteAsset.toImage() = MediaImage(
         // Negative ids keep server photos apart from MediaStore ones in selections and animations.
@@ -125,6 +132,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     fun openTrunk() {
         viewModelScope.launch {
             trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+            trunkAlbums = TrunkLibrary.cachedAlbums(getApplication())
             syncTrunk()
         }
     }
@@ -135,7 +143,17 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             trunkSyncing = true
             try {
                 trunk = TrunkLibrary.sync(getApplication()).map { it.toImage() }
-                viewerIndex?.let { i -> if (open == Source.Trunk) viewerIndex = if (trunk.isEmpty()) null else i.coerceAtMost(trunk.lastIndex) }
+                trunkAlbums = TrunkLibrary.cachedAlbums(getApplication())
+                if (open is Source.TrunkAlbum && trunkAlbums.none { it.id == (open as Source.TrunkAlbum).id }) {
+                    open = null // deleted on another device
+                    viewerIndex = null
+                }
+                viewerIndex?.let { i ->
+                    if (open.onTrunk) {
+                        val n = openImages.size
+                        viewerIndex = if (n == 0) null else i.coerceAtMost(n - 1)
+                    }
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -173,7 +191,8 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             io.github.carnager.peek.trunk.TrunkFiles.clear(getApplication())
             trunkConnected = false
             trunk = emptyList()
-            if (open == Source.Trunk) open = null
+            trunkAlbums = emptyList()
+            if (open.onTrunk) open = null
         }
     }
 
@@ -203,6 +222,63 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     fun trunkFavorite(images: List<MediaImage>, favorite: Boolean) = trunkCall {
         images.mapNotNull { it.remote }.forEach { TrunkLibrary.put(getApplication(), TrunkClient.setFavorite(it.id, favorite)) }
         trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+    }
+
+    // Albums on trunk. Images carry negative ids (see toImage); the server wants its own.
+
+    private fun remoteIds(imageIds: Collection<Long>): List<Long> {
+        val byId = trunk.associateBy { it.id }
+        return imageIds.mapNotNull { byId[it]?.remote?.id }
+    }
+
+    private suspend fun applyAlbum(o: org.json.JSONObject?, deletedId: Long? = null) {
+        trunkAlbums = TrunkLibrary.putAlbum(getApplication(), o, deletedId)
+    }
+
+    /** First photo of a trunk album that is still in the library, for its card. */
+    fun trunkCoverOf(album: io.github.carnager.peek.trunk.RemoteAlbum, byRemote: Map<Long, MediaImage>): MediaImage? =
+        album.assetIds.firstNotNullOfOrNull { byRemote[it] }
+
+    fun trunkCreateAlbum(name: String, imageIds: List<Long> = emptyList(), then: (Long) -> Unit = {}) = trunkCall {
+        val o = TrunkClient.createAlbum(name.trim(), remoteIds(imageIds))
+        applyAlbum(o)
+        if (imageIds.isNotEmpty()) message = Message("${imageIds.size} zu „${o.optString("name")}“ hinzugefügt")
+        then(o.getLong("id"))
+    }
+
+    fun trunkAddTo(albumId: Long, imageIds: List<Long>) = trunkCall {
+        val album = trunkAlbums.firstOrNull { it.id == albumId } ?: return@trunkCall
+        val ids = remoteIds(imageIds)
+        val fresh = ids.filter { it !in album.assetIds }
+        if (fresh.isEmpty()) {
+            message = Message("Schon in „${album.name}“")
+            return@trunkCall
+        }
+        applyAlbum(TrunkClient.addToAlbum(albumId, fresh))
+        message = Message("${fresh.size} zu „${album.name}“ hinzugefügt")
+    }
+
+    fun trunkRemoveFrom(albumId: Long, imageIds: Collection<Long>) = trunkCall {
+        val ids = remoteIds(imageIds)
+        applyAlbum(TrunkClient.removeFromAlbum(albumId, ids))
+        message = Message("${ids.size} aus dem Album entfernt", "Rückgängig") {
+            trunkCall { applyAlbum(TrunkClient.addToAlbum(albumId, ids)) }
+        }
+    }
+
+    fun trunkRenameAlbum(albumId: Long, name: String) = trunkCall {
+        applyAlbum(TrunkClient.renameAlbum(albumId, name.trim()))
+    }
+
+    fun trunkDeleteAlbum(albumId: Long) = trunkCall {
+        val album = trunkAlbums.firstOrNull { it.id == albumId } ?: return@trunkCall
+        TrunkClient.deleteAlbum(albumId)
+        applyAlbum(null, deletedId = albumId)
+        if (open == Source.TrunkAlbum(albumId)) open = null
+        message = Message("Album „${album.name}“ gelöscht. Die Bilder bleiben erhalten.", "Rückgängig") {
+            // The server forgets deleted albums; a new one with the same content takes its place.
+            trunkCall { applyAlbum(TrunkClient.createAlbum(album.name, album.assetIds)) }
+        }
     }
 
     /** Back to the photo as first uploaded. */
@@ -235,6 +311,13 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             images.filter { it.id in ids }
         }
         Source.Trunk -> trunk
+        is Source.TrunkAlbum -> {
+            val album = trunkAlbums.firstOrNull { it.id == source.id }
+            if (album == null) emptyList() else {
+                val byRemote = trunk.associateBy { it.remote!!.id }
+                album.assetIds.mapNotNull { byRemote[it] }
+            }
+        }
     }
 
     val openImages: List<MediaImage> get() = imagesOf(open)
@@ -247,6 +330,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         is Source.Folder -> folders.firstOrNull { it.bucketId == source.bucketId }?.name ?: ""
         is Source.User -> userAlbums.firstOrNull { it.id == source.id }?.name ?: ""
         Source.Trunk -> "trunk"
+        is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.name ?: ""
     }
 
     fun reload(then: (() -> Unit)? = null) {

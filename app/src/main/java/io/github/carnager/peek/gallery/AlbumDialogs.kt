@@ -25,10 +25,86 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.carnager.peek.ui.bounceClick
 
-/** Bottom sheet to put [ids] into one of the user's albums, or a new one. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Bottom sheet to put [ids] into one of the user's albums, or a new one. Server photos (negative
+ * ids, see GalleryViewModel.toImage) go into albums on trunk, phone photos into peek's own.
+ */
 @Composable
 fun AddToAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () -> Unit) {
+    if (ids.isNotEmpty() && ids.all { it < 0 }) TrunkAlbumSheet(vm, ids, onDone) else LocalAlbumSheet(vm, ids, onDone)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrunkAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () -> Unit) {
+    var creating by remember { mutableStateOf(false) }
+    val byRemote = remember(vm.trunk) { vm.trunk.associateBy { it.remote!!.id } }
+    val remoteIds = remember(ids, vm.trunk) { val byId = vm.trunk.associateBy { it.id }; ids.mapNotNull { byId[it]?.remote?.id } }
+    ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Text(
+                if (ids.size == 1) "Zu Album auf trunk hinzufügen" else "${ids.size} Bilder zu Album auf trunk hinzufügen",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                item { NewAlbumRow { creating = true } }
+                items(vm.trunkAlbums, key = { it.id }) { a ->
+                    val cover = remember(a.assetIds, byRemote) { vm.trunkCoverOf(a, byRemote) }
+                    val already = remoteIds.all { it in a.assetIds }
+                    AlbumRow(
+                        title = a.name,
+                        subtitle = if (already) "Schon enthalten" else "${a.assetIds.count { it in byRemote }} Bilder",
+                        leading = { AlbumThumb(cover) },
+                        trailing = if (already) ({ Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary) }) else null,
+                    ) {
+                        vm.trunkAddTo(a.id, ids)
+                        onDone()
+                    }
+                }
+            }
+        }
+    }
+    if (creating) {
+        NameDialog(title = "Neues Album auf trunk", initial = "", confirm = "Anlegen", onDismiss = { creating = false }) { name ->
+            vm.trunkCreateAlbum(name, ids)
+            creating = false
+            onDone()
+        }
+    }
+}
+
+@Composable
+private fun NewAlbumRow(onClick: () -> Unit) {
+    AlbumRow(
+        title = "Neues Album",
+        subtitle = null,
+        leading = {
+            Box(
+                Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+        },
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun AlbumThumb(cover: MediaImage?) {
+    if (cover != null) {
+        Thumb(cover, Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)), size = 200)
+    } else {
+        Box(
+            Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Rounded.PhotoAlbum, null) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocalAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () -> Unit) {
     var creating by remember { mutableStateOf(false) }
     val byId = remember(vm.images) { vm.images.associateBy { it.id } }
     // Always fully open, so one back gesture closes it instead of first halving it.
@@ -41,34 +117,14 @@ fun AddToAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () -> Unit) {
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
             LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                item {
-                    AlbumRow(
-                        title = "Neues Album",
-                        subtitle = null,
-                        leading = {
-                            Box(
-                                Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center,
-                            ) { Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
-                        },
-                    ) { creating = true }
-                }
+                item { NewAlbumRow { creating = true } }
                 items(vm.userAlbums, key = { it.id }) { a ->
                     val cover = remember(a.ids, byId) { a.ids.firstNotNullOfOrNull { byId[it] } }
                     val already = ids.all { it in a.ids }
                     AlbumRow(
                         title = a.name,
                         subtitle = if (already) "Schon enthalten" else "${a.ids.count { it in byId }} Bilder",
-                        leading = {
-                            if (cover != null) {
-                                Thumb(cover, Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)), size = 200)
-                            } else {
-                                Box(
-                                    Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                                    contentAlignment = Alignment.Center,
-                                ) { Icon(Icons.Rounded.PhotoAlbum, null) }
-                            }
-                        },
+                        leading = { AlbumThumb(cover) },
                         trailing = if (already) ({ Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary) }) else null,
                     ) {
                         vm.addTo(a.id, ids)

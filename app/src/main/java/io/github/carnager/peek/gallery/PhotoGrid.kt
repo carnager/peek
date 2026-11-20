@@ -226,11 +226,12 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val isTrash = source == Source.Trash
-    val isTrunk = source == Source.Trunk
+    val isTrunk = source.onTrunk
+    val trunkAlbum = (source as? Source.TrunkAlbum)?.let { s -> vm.trunkAlbums.firstOrNull { it.id == s.id } }
     var limitDialog by remember { mutableStateOf(false) }
     LaunchedEffect(source) { if (isTrunk) vm.openTrunk() }
     val userAlbum = (source as? Source.User)?.let { s -> vm.userAlbums.firstOrNull { it.id == s.id } }
-    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, source) { vm.imagesOf(source) }
+    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkAlbums, source) { vm.imagesOf(source) }
     val cells = remember(list, isTrash) { cellsOf(list, headers = !isTrash) }
     val latestCells by rememberUpdatedState(cells)
     val selecting = vm.selection.isNotEmpty()
@@ -293,12 +294,24 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                         Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Mehr") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
-                                DropdownMenuItem(
+                                if (trunkAlbum != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("Umbenennen") },
+                                        leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                                        onClick = { menu = false; renaming = true },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Album löschen") },
+                                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
+                                        onClick = { menu = false; vm.trunkDeleteAlbum(trunkAlbum.id) },
+                                    )
+                                }
+                                if (trunkAlbum == null) DropdownMenuItem(
                                     text = { Text("Upload-Größe") },
                                     leadingIcon = { Icon(Icons.Rounded.Compress, null) },
                                     onClick = { menu = false; limitDialog = true },
                                 )
-                                DropdownMenuItem(
+                                if (trunkAlbum == null) DropdownMenuItem(
                                     text = { Text("Abmelden") },
                                     leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Logout, null) },
                                     onClick = { menu = false; vm.trunkLogout() },
@@ -428,6 +441,13 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                             PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) "Kein Fav." else "Favorit") {
                                 vm.trunkFavorite(selected, !allFav)
                             }
+                            PillAction(Icons.Rounded.PhotoAlbum, "Album") { vm.addToAlbum = selected.map { it.id } }
+                            if (trunkAlbum != null) {
+                                PillAction(Icons.Rounded.RemoveCircleOutline, "Entfernen") {
+                                    vm.trunkRemoveFrom(trunkAlbum.id, selected.map { it.id })
+                                    vm.selection = emptySet()
+                                }
+                            }
                             PillAction(Icons.Rounded.DeleteOutline, "Löschen") { vm.trunkTrash(selected) }
                         } else if (isTrash) {
                             PillAction(Icons.Rounded.RestoreFromTrash, "Wiederherstellen") { ops.restore(selected) }
@@ -473,6 +493,12 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
             renaming = false
         }
     }
+    if (renaming && trunkAlbum != null) {
+        NameDialog("Album umbenennen", trunkAlbum.name, "Speichern", onDismiss = { renaming = false }) {
+            vm.trunkRenameAlbum(trunkAlbum.id, it)
+            renaming = false
+        }
+    }
     if (confirmEmpty) {
         AlertDialog(
             onDismissRequest = { confirmEmpty = false },
@@ -496,6 +522,7 @@ private fun EmptyState(source: Source, modifier: Modifier) {
         Source.Favorites -> Triple(Icons.Rounded.FavoriteBorder, "Noch keine Favoriten", "Tippe im Viewer aufs Herz, um ein Bild hier zu sammeln.")
         Source.Trash -> Triple(Icons.Rounded.DeleteOutline, "Papierkorb ist leer", "Gelöschte Bilder landen hier und bleiben 30 Tage wiederherstellbar.")
         is Source.User -> Triple(Icons.Rounded.PhotoAlbum, "Album ist leer", "Wähle Bilder in einem Ordner aus und tippe auf „Album“.")
+        is Source.TrunkAlbum -> Triple(Icons.Rounded.PhotoAlbum, "Album ist leer", "Wähle Bilder in trunk aus und tippe auf „Album“.")
         else -> Triple(Icons.Rounded.PhotoLibrary, "Keine Bilder", "")
     }
     Column(

@@ -14,8 +14,10 @@ import java.io.File
  * works offline. Kept current with delta sync: only what changed since the stored cursor is fetched.
  */
 object TrunkLibrary {
+    private const val CACHE_VERSION = 2
     private val lock = Mutex()
     private val byId = LinkedHashMap<Long, RemoteAsset>()
+    private val albums = LinkedHashMap<Long, RemoteAlbum>()
     private var cursor = 0L
     private var owner: String? = null
     private var loaded = false
@@ -29,22 +31,28 @@ object TrunkLibrary {
     private fun loadCache(ctx: Context) {
         if (loaded && owner == currentOwner()) return
         byId.clear()
+        albums.clear()
         cursor = 0
         owner = currentOwner()
         loaded = true
         runCatching {
             val o = JSONObject(file(ctx).readText())
-            if (o.optString("owner") != owner) return
+            // Older caches ignored albums but moved their cursor past them: sync from scratch once.
+            if (o.optString("owner") != owner || o.optInt("version") < CACHE_VERSION) return
             cursor = o.optLong("cursor")
             val arr = o.getJSONArray("assets")
             for (i in 0 until arr.length()) RemoteAsset.parse(arr.getJSONObject(i)).let { byId[it.id] = it }
+            val al = o.optJSONArray("albums") ?: JSONArray()
+            for (i in 0 until al.length()) RemoteAlbum.parse(al.getJSONObject(i)).let { albums[it.id] = it }
         }
     }
 
     private fun saveCache(ctx: Context) {
         val arr = JSONArray()
         byId.values.forEach { arr.put(it.json) }
-        val o = JSONObject().put("owner", owner).put("cursor", cursor).put("assets", arr)
+        val al = JSONArray()
+        albums.values.forEach { al.put(it.json) }
+        val o = JSONObject().put("version", CACHE_VERSION).put("owner", owner).put("cursor", cursor).put("assets", arr).put("albums", al)
         val tmp = File(dir(ctx), "library.json.tmp")
         tmp.writeText(o.toString())
         tmp.renameTo(file(ctx))
@@ -58,6 +66,27 @@ object TrunkLibrary {
         }
     }
 
+    /** The server's albums, newest first. */
+    suspend fun cachedAlbums(ctx: Context): List<RemoteAlbum> = withContext(Dispatchers.IO) {
+        lock.withLock {
+            loadCache(ctx)
+            albumSnapshot()
+        }
+    }
+
+    private fun albumSnapshot() = albums.values.sortedWith(compareByDescending<RemoteAlbum> { it.createdAt }.thenByDescending { it.id })
+
+    /** Applies an album from an API response, or drops it when [deletedId] is given. */
+    suspend fun putAlbum(ctx: Context, o: JSONObject?, deletedId: Long? = null): List<RemoteAlbum> = withContext(Dispatchers.IO) {
+        lock.withLock {
+            loadCache(ctx)
+            if (o != null) RemoteAlbum.parse(o).let { albums[it.id] = it }
+            if (deletedId != null) albums.remove(deletedId)
+            saveCache(ctx)
+            albumSnapshot()
+        }
+    }
+
     private fun snapshot() = byId.values.filter { !it.trashed }.sortedWith(compareByDescending<RemoteAsset> { it.takenAt }.thenByDescending { it.id })
 
     /** Fetches what changed since last time and returns the updated library. */
@@ -67,15 +96,22 @@ object TrunkLibrary {
             var more = true
             var changed = false
             while (more) {
-                val (assets, next, hasMore) = TrunkClient.changes(cursor)
-                for (i in 0 until assets.length()) {
-                    val o = assets.getJSONObject(i)
+                val page = TrunkClient.changes(cursor)
+                for (i in 0 until page.assets.length()) {
+                    val o = page.assets.getJSONObject(i)
                     val id = o.getLong("id")
                     if (o.optBoolean("deleted")) byId.remove(id) else byId[id] = RemoteAsset.parse(o)
                     changed = true
                 }
-                cursor = next
-                more = hasMore
+                for (i in 0 until page.albums.length()) {
+                    val o = page.albums.getJSONObject(i)
+                    val id = o.getLong("id")
+                    if (o.optBoolean("deleted")) albums.remove(id) else albums[id] = RemoteAlbum.parse(o)
+                    changed = true
+                }
+                if (page.cursor != cursor) changed = true
+                cursor = page.cursor
+                more = page.more
             }
             if (changed) saveCache(ctx)
             snapshot()
@@ -94,6 +130,7 @@ object TrunkLibrary {
     suspend fun clear(ctx: Context) = withContext(Dispatchers.IO) {
         lock.withLock {
             byId.clear()
+            albums.clear()
             cursor = 0
             loaded = false
             file(ctx).delete()

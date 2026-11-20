@@ -170,7 +170,7 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                                 val remote = img?.remote
                                 if (img != null && remote != null) vm.withTrunkOriginals(listOf(img)) { ops.editTrunk(it[0], remote) } else ops.edit(item.uri)
                             },
-                            onShare = if (vm.open != Source.Trunk) null else { item ->
+                            onShare = if (!vm.open.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { img ->
                                     vm.withTrunkOriginals(listOf(img)) { io.github.carnager.peek.viewer.share(ctx, it, img.mimeType) }
                                 }
@@ -183,11 +183,11 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                                     if (it.remote != null) vm.trunkFavorite(listOf(it), !it.isFavorite) else ops.setFavorite(listOf(it), !it.isFavorite)
                                 }
                             },
-                            // Albums hold phone photos; server photos would need server albums.
-                            onRevertEdit = if (vm.open != Source.Trunk) null else { item ->
+                            onRevertEdit = if (!vm.open.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { vm.trunkRevertEdit(it) }
                             },
-                            onAddToAlbum = if (vm.open == Source.Trunk) null else { item -> list.firstOrNull { it.uri == item.uri }?.let { vm.addToAlbum = listOf(it.id) } },
+                            // Phone photos go into peek's albums, server photos into trunk's.
+                            onAddToAlbum = { item -> list.firstOrNull { it.uri == item.uri }?.let { vm.addToAlbum = listOf(it.id) } },
                             onPageChange = { if (vm.viewerIndex != null) vm.viewerIndex = it },
                         )
                     }
@@ -278,8 +278,12 @@ private fun closeHero(vm: GalleryViewModel, list: List<MediaImage>, w: Float, h:
 private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridState) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var creating by remember { mutableStateOf(false) }
+    var creatingTrunk by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
     val upload = rememberUploadProgress(vm)
+    // The server's albums show here too: load the cached library, then ask what changed.
+    LaunchedEffect(vm.trunkConnected) { if (vm.trunkConnected) vm.openTrunk() }
+    val trunkByRemote = remember(vm.trunk) { vm.trunk.associateBy { it.remote!!.id } }
     // Re-checked on every recomposition, so returning from the settings page updates it.
     var canManage by remember { mutableStateOf(ops.canManageMedia) }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
@@ -342,6 +346,36 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
             item(key = "trunk", span = { GridItemSpan(maxLineSpan) }) {
                 TrunkCard(vm, upload) { if (vm.trunkConnected) vm.open = Source.Trunk else connecting = true }
             }
+            if (vm.trunkConnected) {
+                item(key = "trunkAlbumsHeader", span = { GridItemSpan(maxLineSpan) }) {
+                    SectionHeader("Alben auf trunk") {
+                        FilledTonalButton(onClick = { creatingTrunk = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                            Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Neu")
+                        }
+                    }
+                }
+                if (vm.trunkAlbums.isEmpty()) {
+                    item(key = "trunkAlbumsEmpty", span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            "Alben auf dem Server sehen alle deine Geräte. Wähle Bilder in trunk aus und tippe auf „Album“.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
+                    }
+                }
+                items(vm.trunkAlbums, key = { "t:" + it.id }) { a ->
+                    val cover = remember(a.assetIds, trunkByRemote) { vm.trunkCoverOf(a, trunkByRemote) }
+                    val count = remember(a.assetIds, trunkByRemote) { a.assetIds.count { it in trunkByRemote } }
+                    if (cover != null) {
+                        AlbumCard(a.name, count, cover, Modifier.animateItem()) { vm.open = Source.TrunkAlbum(a.id) }
+                    } else {
+                        EmptyAlbumCard(a.name, Modifier.animateItem()) { vm.open = Source.TrunkAlbum(a.id) }
+                    }
+                }
+            }
             item(key = "albumsHeader", span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader("Alben") {
                     FilledTonalButton(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
@@ -382,6 +416,12 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
         NameDialog(title = "Neues Album", initial = "", confirm = "Anlegen", onDismiss = { creating = false }) { name ->
             creating = false
             vm.open = Source.User(vm.createAlbum(name).id)
+        }
+    }
+    if (creatingTrunk) {
+        NameDialog(title = "Neues Album auf trunk", initial = "", confirm = "Anlegen", onDismiss = { creatingTrunk = false }) { name ->
+            creatingTrunk = false
+            vm.trunkCreateAlbum(name) { id -> vm.open = Source.TrunkAlbum(id) }
         }
     }
     if (connecting) {

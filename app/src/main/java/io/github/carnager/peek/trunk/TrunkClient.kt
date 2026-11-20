@@ -155,6 +155,25 @@ data class RemoteAsset(
     }
 }
 
+/** An album on the server: an ordered list of asset ids. */
+data class RemoteAlbum(
+    val id: Long,
+    val name: String,
+    val assetIds: List<Long>,
+    val createdAt: String,
+    val json: JSONObject,
+) {
+    companion object {
+        fun parse(o: JSONObject): RemoteAlbum {
+            val ids = o.optJSONArray("asset_ids") ?: JSONArray()
+            return RemoteAlbum(o.getLong("id"), o.optString("name"), List(ids.length()) { ids.getLong(it) }, o.optString("created_at"), o)
+        }
+    }
+}
+
+/** One page of the server's changes feed. */
+class ChangesPage(val assets: JSONArray, val albums: JSONArray, val cursor: Long, val more: Boolean)
+
 object TrunkClient {
     private val json = "application/json".toMediaType()
 
@@ -219,9 +238,33 @@ object TrunkClient {
     }
 
     /** One page of changes after [since]. */
-    suspend fun changes(since: Long, limit: Int = 1000): Triple<JSONArray, Long, Boolean> = withContext(Dispatchers.IO) {
+    suspend fun changes(since: Long, limit: Int = 1000): ChangesPage = withContext(Dispatchers.IO) {
         val o = call(Request.Builder().url(TrunkAccount.api("/changes?since=$since&limit=$limit")).build())
-        Triple(o.optJSONArray("assets") ?: JSONArray(), o.optLong("cursor", since), o.optBoolean("more"))
+        ChangesPage(o.optJSONArray("assets") ?: JSONArray(), o.optJSONArray("albums") ?: JSONArray(), o.optLong("cursor", since), o.optBoolean("more"))
+    }
+
+    // Albums. Each call returns the album as it is now (null after deleting).
+
+    suspend fun createAlbum(name: String, assetIds: List<Long> = emptyList()): JSONObject = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("name", name).put("asset_ids", JSONArray(assetIds))
+        call(Request.Builder().url(TrunkAccount.api("/albums")).post(body.toString().toRequestBody(json)).build())
+    }
+
+    suspend fun renameAlbum(id: Long, name: String): JSONObject = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/albums/$id")).patch(JSONObject().put("name", name).toString().toRequestBody(json)).build())
+    }
+
+    /** Adds to the front, in the order given, like peek's own albums. */
+    suspend fun addToAlbum(id: Long, assetIds: List<Long>): JSONObject = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/albums/$id/add")).post(JSONObject().put("ids", JSONArray(assetIds)).toString().toRequestBody(json)).build())
+    }
+
+    suspend fun removeFromAlbum(id: Long, assetIds: Collection<Long>): JSONObject = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/albums/$id/remove")).post(JSONObject().put("ids", JSONArray(assetIds)).toString().toRequestBody(json)).build())
+    }
+
+    suspend fun deleteAlbum(id: Long) = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/albums/$id")).delete().build())
     }
 
     suspend fun setFavorite(id: Long, favorite: Boolean): JSONObject = withContext(Dispatchers.IO) {
