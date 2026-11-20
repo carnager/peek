@@ -29,8 +29,8 @@ android {
         applicationId = "io.github.carnager.peek"
         minSdk = 30
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.19.0"
+        versionCode = 21
+        versionName = "0.20.0"
         // Phones are arm64; keeps ONNX Runtime's other builds (30–45 MB each) out of the APK.
         ndk { abiFilters += listOf("arm64-v8a") }
     }
