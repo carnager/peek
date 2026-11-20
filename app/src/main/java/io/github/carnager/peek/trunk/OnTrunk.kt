@@ -47,8 +47,17 @@ object OnTrunk {
         }
     }
 
-    /** The ids of [local] photos trunk does not have, given its library [remote]. */
-    suspend fun missing(ctx: Context, local: List<MediaImage>, remote: List<RemoteAsset>): Set<Long> = withContext(Dispatchers.IO) {
+    /**
+     * The ids of [local] photos trunk does not have, given its library [remote]. [early] gets a
+     * first answer before any file is read: [surelyNew] among those the name did not match.
+     */
+    suspend fun missing(
+        ctx: Context,
+        local: List<MediaImage>,
+        remote: List<RemoteAsset>,
+        surelyNew: Set<Long> = emptySet(),
+        early: (Set<Long>) -> Unit = {},
+    ): Set<Long> = withContext(Dispatchers.IO) {
         val byName = HashMap<String, MutableList<Long>>()
         for (r in remote) byName.getOrPut(r.name.lowercase()) { ArrayList() } += r.takenAt
         val unsure = local.filter { img ->
@@ -56,8 +65,10 @@ object OnTrunk {
             times == null || times.none { abs(it - img.dateTaken) < SAME_TIME_MS }
         }
         if (unsure.isEmpty()) return@withContext emptySet()
+        early(unsure.mapNotNullTo(HashSet()) { it.id.takeIf { id -> id in surelyNew } })
 
         val cache = load(ctx)
+        val unreadable = HashSet<Long>()
         var hashed = 0
         val shaOf = HashMap<Long, String>()
         for (img in unsure) {
@@ -65,7 +76,15 @@ object OnTrunk {
             val k = key(img)
             val sha = cache[k] ?: runCatching {
                 Uploader.hash(ctx, Uploader.Item(img.uri, img.name, img.mimeType, img.size, img.dateTaken, img.isVideo))
-            }.getOrNull()?.also { cache[k] = it; hashed++ } ?: continue
+            }.getOrNull()?.also {
+                cache[k] = it
+                // Saved along the way: an interrupted first run (a big camera folder) loses nothing.
+                if (++hashed % 50 == 0) save(ctx, cache)
+            }
+            if (sha == null) {
+                unreadable += img.id // shown as only on the phone rather than hidden
+                continue
+            }
             shaOf[img.id] = sha
         }
         // Keep the hashes of files still there; forget the rest.
@@ -77,6 +96,6 @@ object OnTrunk {
         for (chunk in shaOf.values.distinct().chunked(2000)) {
             known += TrunkClient.check(chunk).keys
         }
-        shaOf.filterValues { it !in known }.keys
+        shaOf.filterValues { it !in known }.keys + unreadable
     }
 }

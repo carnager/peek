@@ -309,22 +309,43 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         private set
     private var phoneOnlyJob: kotlinx.coroutines.Job? = null
 
-    /** Works out [phoneOnly] again, a moment after the phone's or trunk's photos changed. */
+    private var phoneOnlyAgain = false
+
+    /**
+     * Works out [phoneOnly] again, a moment after the phone's or trunk's photos changed. A run is
+     * not cancelled by the next change (the first one may read many files): that change is looked
+     * at once it is done.
+     */
     private fun refreshPhoneOnly() {
-        phoneOnlyJob?.cancel()
         if (!trunkConnected) {
+            phoneOnlyJob?.cancel()
             phoneOnly = emptyList()
             return
         }
+        if (phoneOnlyJob?.isActive == true) {
+            phoneOnlyAgain = true
+            return
+        }
         phoneOnlyJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(800)
-            val folders = uploadFolders
-            val local = images.filter { it.bucketId in folders }
-            val remote = trunkAll.mapNotNull { it.remote }
-            val missing = runCatching { io.github.carnager.peek.trunk.OnTrunk.missing(getApplication(), local, remote) }
-                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; android.util.Log.w("peek-trunk", "phone-only check", it) }
-                .getOrNull() ?: return@launch
-            phoneOnly = local.filter { it.id in missing }
+            do {
+                phoneOnlyAgain = false
+                kotlinx.coroutines.delay(800)
+                val folders = uploadFolders
+                val local = images.filter { it.bucketId in folders }
+                val remote = trunkAll.mapNotNull { it.remote }
+                // Photos still waiting for the review are new: shown before any file is read.
+                val waiting = reviewPending.mapTo(HashSet()) { it.id }
+                val missing = runCatching {
+                    io.github.carnager.peek.trunk.OnTrunk.missing(getApplication(), local, remote, waiting) { first ->
+                        val known = phoneOnly.mapTo(HashSet()) { it.id }
+                        if (!known.containsAll(first)) phoneOnly = local.filter { it.id in first || it.id in known }
+                    }
+                }.onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    android.util.Log.w("peek-trunk", "phone-only check", it)
+                }.getOrNull()
+                if (missing != null) phoneOnly = local.filter { it.id in missing }
+            } while (phoneOnlyAgain)
         }
     }
 
