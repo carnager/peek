@@ -16,6 +16,9 @@ interface MediaOps {
     /** Queues photos and videos for upload to trunk, asking for what the upload needs first. */
     fun uploadToTrunk(images: List<MediaImage>)
 
+    /** Asks to show notifications (for the evening reminder); [then] learns whether it may. */
+    fun requestNotifications(then: (Boolean) -> Unit)
+
     /** With "media management" granted, the above run without a confirmation dialog each time. */
     val canManageMedia: Boolean
     fun requestManageMedia()

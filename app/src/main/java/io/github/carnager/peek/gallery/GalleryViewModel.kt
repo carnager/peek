@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -354,6 +355,10 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             folders = MediaRepository.albumsOf(list)
             trash = trashList
             loaded = true
+            if (reviewWhenLoaded) {
+                reviewWhenLoaded = false
+                startReview()
+            }
             val ids = (list + trash).mapTo(HashSet()) { it.id }
             selection = selection.filterTo(HashSet()) { it in ids }
             viewerIndex?.let { i ->
@@ -379,6 +384,52 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     fun byIds(ids: Collection<Long>): List<MediaImage> {
         val set = ids.toHashSet()
         return (images + trash).filter { it.id in set }
+    }
+
+    // --- nightly review ---
+
+    /** A review in progress: the photos it shows and the DATE_ADDED mark it moves to when finished. */
+    class ReviewSession(val items: List<MediaImage>, val addedUpTo: Long)
+
+    var review by mutableStateOf<ReviewSession?>(null)
+    var reviewSettings by mutableStateOf(io.github.carnager.peek.review.Review.settings(app))
+        private set
+    private var reviewMark by mutableLongStateOf(io.github.carnager.peek.review.Review.mark(app))
+    private var reviewWhenLoaded = false
+
+    /** Photos and videos waiting for review, oldest first, like the day went. */
+    val reviewPending: List<MediaImage>
+        get() {
+            val s = reviewSettings
+            if (!s.configured || s.buckets.isEmpty()) return emptyList()
+            return images.filter { it.bucketId in s.buckets && it.added > reviewMark }.sortedBy { it.dateTaken }
+        }
+
+    fun saveReviewSettings(s: io.github.carnager.peek.review.Review.Settings) {
+        io.github.carnager.peek.review.Review.save(getApplication(), s)
+        reviewSettings = io.github.carnager.peek.review.Review.settings(getApplication())
+        reviewMark = io.github.carnager.peek.review.Review.mark(getApplication())
+    }
+
+    /** Opens the review; from the notification the photos may still be loading. */
+    fun startReview() {
+        if (!loaded) {
+            reviewWhenLoaded = true
+            return
+        }
+        val items = reviewPending
+        if (items.isEmpty()) {
+            message = Message("Nichts Neues zum Durchsehen")
+            return
+        }
+        viewerIndex = null
+        review = ReviewSession(items, items.maxOf { it.added })
+    }
+
+    fun finishReview(session: ReviewSession) {
+        io.github.carnager.peek.review.Review.finished(getApplication(), session.addedUpTo)
+        reviewMark = io.github.carnager.peek.review.Review.mark(getApplication())
+        review = null
     }
 
     // --- user albums ---

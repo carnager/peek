@@ -171,6 +171,9 @@ data class RemoteAlbum(
     }
 }
 
+/** What an upload did: created a new asset, or found the content already there. */
+data class Sent(val created: Boolean, val assetId: Long?)
+
 /** One page of the server's changes feed. */
 class ChangesPage(val assets: JSONArray, val albums: JSONArray, val cursor: Long, val more: Boolean)
 
@@ -290,7 +293,7 @@ object TrunkClient {
      * Simple upload of a whole file. Returns whether the server created a new asset. [sourceSha256] is the
      * hash of the phone's file when [sha256] belongs to a shrunk copy of it.
      */
-    fun upload(name: String, mtime: Long, sha256: String, mime: String, length: Long, sourceSha256: String? = null, write: (BufferedSink) -> Unit): Boolean {
+    fun upload(name: String, mtime: Long, sha256: String, mime: String, length: Long, sourceSha256: String? = null, write: (BufferedSink) -> Unit): Sent {
         val body = object : RequestBody() {
             override fun contentType() = mime.toMediaType()
             override fun contentLength() = length
@@ -302,17 +305,24 @@ object TrunkClient {
             .apply { if (sourceSha256 != null) addQueryParameter("source_sha256", sourceSha256) }
             .build()
         val res = call(Request.Builder().url(full).header("X-Sha256", sha256).post(body).build())
-        return res.optBoolean("created")
+        return Sent(res.optBoolean("created"), res.optJSONObject("asset")?.optLong("id")?.takeIf { it > 0 })
     }
 
     /** Stores [file] as the edited version of asset [id]; trunk keeps the first upload. Returns the updated asset. */
     suspend fun saveEdit(id: Long, file: java.io.File, sha256: String, mime: String): JSONObject = withContext(Dispatchers.IO) {
+        saveEdit(id, sha256, mime, file.length()) { sink -> file.inputStream().use { it.copyTo(sink.outputStream()) } }
+    }
+
+    /** [saveEdit] with the content written by [write]. */
+    fun saveEdit(id: Long, sha256: String, mime: String, length: Long, write: (BufferedSink) -> Unit): JSONObject {
         val body = object : RequestBody() {
             override fun contentType() = mime.toMediaType()
-            override fun contentLength() = file.length()
-            override fun writeTo(sink: BufferedSink) { file.inputStream().use { it.copyTo(sink.outputStream()) } }
+            override fun contentLength() = length
+            override fun writeTo(sink: BufferedSink) = write(sink)
         }
-        call(Request.Builder().url(TrunkAccount.api("/assets/$id/edit")).header("X-Sha256", sha256).put(body).build())
+        // Edits are uploaded whole; give them the time a big photo needs on a slow link.
+        val req = Request.Builder().url(TrunkAccount.api("/assets/$id/edit")).header("X-Sha256", sha256).put(body).build()
+        return http.newCall(req).apply { timeout().timeout(5, TimeUnit.MINUTES) }.execute().use { it.bodyJson() }
     }
 
     /** Drops the edit; the photo shows its first upload again. Returns the updated asset. */
@@ -329,7 +339,7 @@ object TrunkClient {
         chunk: Int = 8 shl 20,
         read: (offset: Long, buf: ByteArray) -> Int,
         onProgress: (Long) -> Unit,
-    ): Boolean {
+    ): Sent {
         fun b64(s: String) = android.util.Base64.encodeToString(s.toByteArray(), android.util.Base64.NO_WRAP)
         val create = Request.Builder().url(TrunkAccount.api("/uploads"))
             .header("Tus-Resumable", "1.0.0")
@@ -345,6 +355,7 @@ object TrunkClient {
         var offset = 0L
         val buf = ByteArray(chunk)
         var created = false
+        var assetId: Long? = null
         var attempts = 0
         while (offset < length) {
             val n = read(offset, buf)
@@ -358,6 +369,7 @@ object TrunkClient {
                     if (!r.isSuccessful) r.bodyJson()
                     offset = r.header("Upload-Offset")?.toLongOrNull() ?: (offset + n)
                     r.header("Trunk-Asset-Created")?.let { created = it == "true" }
+                    r.header("Trunk-Asset-Id")?.toLongOrNull()?.let { assetId = it }
                 }
                 attempts = 0
                 onProgress(offset)
@@ -369,6 +381,6 @@ object TrunkClient {
                     .use { it.header("Upload-Offset")?.toLongOrNull() ?: offset }
             }
         }
-        return created
+        return Sent(created, assetId)
     }
 }

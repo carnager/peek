@@ -225,9 +225,11 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
             }
         }
 
-        // Keep messages clear of whichever floating bar is showing: the viewer's actions or the
-        // selection pill (both about 60dp tall, 20dp above the navigation bar).
-        val barShown = vm.viewerIndex != null || vm.selection.isNotEmpty()
+        vm.review?.let { io.github.carnager.peek.review.ReviewScreen(vm, ops, it) }
+
+        // Keep messages clear of whichever bar is showing: the viewer's actions, the selection
+        // pill or the review's buttons (all about 60dp tall, near the navigation bar).
+        val barShown = vm.viewerIndex != null || vm.selection.isNotEmpty() || vm.review != null
         val snackbarLift by androidx.compose.animation.core.animateDpAsState(if (barShown) 96.dp else 16.dp, label = "snackbarLift")
         SnackbarHost(
             snackbar,
@@ -279,6 +281,7 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var creating by remember { mutableStateOf(false) }
     var creatingTrunk by remember { mutableStateOf(false) }
+    var reviewSettings by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
     val upload = rememberUploadProgress(vm)
     // The server's albums show here too: load the cached library, then ask what changed.
@@ -345,6 +348,9 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
                 }
             }
 
+            item(key = "review", span = { GridItemSpan(maxLineSpan) }) {
+                io.github.carnager.peek.review.ReviewCard(vm) { reviewSettings = true }
+            }
             item(key = "trunk", span = { GridItemSpan(maxLineSpan) }) {
                 TrunkCard(vm, upload) { if (vm.trunkConnected) vm.open = Source.Trunk else connecting = true }
             }
@@ -419,6 +425,9 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
             creating = false
             vm.open = Source.User(vm.createAlbum(name).id)
         }
+    }
+    if (reviewSettings) {
+        io.github.carnager.peek.review.ReviewSettingsSheet(vm, ops) { reviewSettings = false }
     }
     if (creatingTrunk) {
         NameDialog(title = "Neues Album auf trunk", initial = "", confirm = "Anlegen", onDismiss = { creatingTrunk = false }) { name ->

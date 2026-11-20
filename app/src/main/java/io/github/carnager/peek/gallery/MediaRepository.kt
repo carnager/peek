@@ -21,6 +21,8 @@ data class MediaImage(
     val dateTaken: Long,
     /** Seconds; changes when the file is rewritten, so caches can tell versions apart. */
     val modified: Long,
+    /** Seconds; when the file arrived on the phone. The nightly review shows what came since. */
+    val added: Long = 0,
     val isFavorite: Boolean = false,
     /** For trashed items: when the system deletes it for good (ms), else 0. */
     val expires: Long = 0,
@@ -110,6 +112,7 @@ object MediaRepository {
                     size = c.getLong(sizeCol),
                     dateTaken = taken,
                     modified = c.getLong(modCol),
+                    added = c.getLong(addedCol),
                     isFavorite = c.getInt(favCol) == 1,
                     expires = c.getLong(expCol) * 1000,
                     isVideo = video,

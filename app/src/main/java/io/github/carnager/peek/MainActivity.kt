@@ -64,6 +64,12 @@ class MainActivity : ComponentActivity() {
     private var pendingUpload: List<MediaImage> = emptyList()
     private val uploadPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startUpload() }
 
+    private var pendingNotify: ((Boolean) -> Unit)? = null
+    private val notifyPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pendingNotify?.invoke(granted)
+        pendingNotify = null
+    }
+
     private fun startUpload() {
         val images = pendingUpload
         pendingUpload = emptyList()
@@ -127,6 +133,17 @@ class MainActivity : ComponentActivity() {
             if (wanted.isEmpty()) startUpload() else uploadPermissions.launch(wanted.toTypedArray())
         }
 
+        override fun requestNotifications(then: (Boolean) -> Unit) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            ) {
+                then(true)
+            } else {
+                pendingNotify = then
+                notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         override val canManageMedia: Boolean
             get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && MediaStore.canManageMedia(this@MainActivity)
 
@@ -161,9 +178,24 @@ class MainActivity : ComponentActivity() {
     private fun hasPartialAccess() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openReviewIfAsked(intent)
+    }
+
+    /** The evening notification opens the review. */
+    private fun openReviewIfAsked(intent: Intent?) {
+        if (intent?.getBooleanExtra(io.github.carnager.peek.review.Review.EXTRA_START, false) == true) {
+            intent.removeExtra(io.github.carnager.peek.review.Review.EXTRA_START) // not again on rotation
+            vm.startReview()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) openReviewIfAsked(intent)
         setContent {
             PeekTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
