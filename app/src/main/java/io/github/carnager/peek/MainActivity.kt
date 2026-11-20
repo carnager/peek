@@ -2,7 +2,13 @@ package io.github.carnager.peek
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.app.PendingIntent
+import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
+import io.github.carnager.peek.gallery.MediaImage
+import io.github.carnager.peek.gallery.MediaOps
+import io.github.carnager.peek.gallery.Message
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -42,10 +48,66 @@ import io.github.carnager.peek.ui.PeekTheme
 class MainActivity : ComponentActivity() {
     private val vm: GalleryViewModel by viewModels()
 
-    private val deleteRequest = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
-        if (res.resultCode == RESULT_OK) {
-            vm.selection = emptySet()
-            vm.reload()
+    private var pendingOk: (() -> Unit)? = null
+    private val mediaRequest = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        val ok = pendingOk
+        pendingOk = null
+        if (res.resultCode == RESULT_OK) ok?.invoke()
+    }
+
+    /** Runs a MediaStore consent request; with MANAGE_MEDIA it completes without showing anything. */
+    private fun request(pi: PendingIntent, onOk: () -> Unit) {
+        pendingOk = onOk
+        mediaRequest.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+    }
+
+    private fun plural(n: Int) = if (n == 1) "1 Bild" else "$n Bilder"
+
+    private val ops = object : MediaOps {
+        override fun trash(images: List<MediaImage>) {
+            if (images.isEmpty()) return
+            request(MediaStore.createTrashRequest(contentResolver, images.map { it.uri }, true)) {
+                vm.selection = emptySet()
+                vm.reload()
+                vm.message = Message("${plural(images.size)} im Papierkorb", "Rückgängig") { untrash(images, quiet = true) }
+            }
+        }
+
+        override fun restore(images: List<MediaImage>) = untrash(images, quiet = false)
+
+        private fun untrash(images: List<MediaImage>, quiet: Boolean) {
+            if (images.isEmpty()) return
+            request(MediaStore.createTrashRequest(contentResolver, images.map { it.uri }, false)) {
+                vm.selection = emptySet()
+                vm.reload()
+                if (!quiet) vm.message = Message("${plural(images.size)} wiederhergestellt")
+            }
+        }
+
+        override fun deleteForever(images: List<MediaImage>) {
+            if (images.isEmpty()) return
+            request(MediaStore.createDeleteRequest(contentResolver, images.map { it.uri })) {
+                vm.selection = emptySet()
+                vm.reload()
+                vm.message = Message("${plural(images.size)} endgültig gelöscht")
+            }
+        }
+
+        override fun setFavorite(images: List<MediaImage>, favorite: Boolean) {
+            if (images.isEmpty()) return
+            request(MediaStore.createFavoriteRequest(contentResolver, images.map { it.uri }, favorite)) {
+                vm.reload()
+            }
+        }
+
+        override fun edit(uri: Uri) = editor.launch(EditorActivity.intent(this@MainActivity, uri))
+
+        override val canManageMedia: Boolean
+            get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && MediaStore.canManageMedia(this@MainActivity)
+
+        override fun requestManageMedia() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+            startActivity(Intent(Settings.ACTION_REQUEST_MANAGE_MEDIA, Uri.parse("package:$packageName")))
         }
     }
 
@@ -92,11 +154,7 @@ class MainActivity : ComponentActivity() {
                         onPauseOrDispose {}
                     }
                     if (full || partial) {
-                        GalleryScreen(
-                            vm = vm,
-                            onEdit = { editor.launch(EditorActivity.intent(this, it)) },
-                            onDelete = ::delete,
-                        )
+                        GalleryScreen(vm = vm, ops = ops)
                     } else {
                         PermissionScreen { request.launch(requestSet()) }
                     }
@@ -112,12 +170,6 @@ class MainActivity : ComponentActivity() {
             readPermissions
         }
 
-    private fun delete(uris: List<Uri>) {
-        if (uris.isEmpty()) return
-        // The system shows its own confirmation, so no extra dialog here.
-        val pi = MediaStore.createDeleteRequest(contentResolver, uris)
-        deleteRequest.launch(IntentSenderRequest.Builder(pi.intentSender).build())
-    }
 }
 
 @Composable

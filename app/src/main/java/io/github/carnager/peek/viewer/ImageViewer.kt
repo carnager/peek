@@ -81,6 +81,9 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.rounded.AspectRatio
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.PhotoAlbum
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Camera
@@ -112,6 +115,7 @@ data class ViewerItem(
     val version: Long = 0,
     /** Memory-cache key of an already loaded thumbnail, shown until the full image is ready. */
     val placeholderKey: String? = null,
+    val favorite: Boolean = false,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -125,6 +129,8 @@ fun ImageViewer(
     onPageChange: (Int) -> Unit = {},
     /** Called instead of [onClose] after a swipe-away, with the photo's offset, scale and backdrop opacity. */
     onSwipeClose: ((offsetY: Float, scale: Float, backdrop: Float) -> Unit)? = null,
+    onFavorite: ((ViewerItem) -> Unit)? = null,
+    onAddToAlbum: ((ViewerItem) -> Unit)? = null,
 ) {
     if (items.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
@@ -233,6 +239,13 @@ fun ImageViewer(
                             leadingIcon = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null) },
                             onClick = { menu = false; openWith(ctx, current) },
                         )
+                        if (onAddToAlbum != null) {
+                            DropdownMenuItem(
+                                text = { Text("Zu Album hinzufügen") },
+                                leadingIcon = { Icon(Icons.Rounded.PhotoAlbum, null) },
+                                onClick = { menu = false; onAddToAlbum(current) },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Festlegen als") },
                             leadingIcon = { Icon(Icons.Rounded.Wallpaper, null) },
@@ -259,6 +272,9 @@ fun ImageViewer(
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
                     PillIcon(Icons.Rounded.Share, "Teilen") { share(ctx, listOf(current.uri), current.mimeType) }
+                    if (onFavorite != null) {
+                        FavoriteIcon(current.favorite) { onFavorite(current) }
+                    }
                     PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
                     if (onDelete != null) PillIcon(Icons.Rounded.DeleteOutline, "Löschen") { onDelete(current) }
                     PillIcon(Icons.Rounded.Info, "Info") { info = current }
@@ -285,6 +301,39 @@ private fun GlassButton(icon: ImageVector, label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, label, tint = Color.White)
+    }
+}
+
+/** A heart that pops when it turns on. */
+@Composable
+private fun FavoriteIcon(on: Boolean, onClick: () -> Unit) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val scale = remember { Animatable(1f) }
+    var last by remember { mutableStateOf(on) }
+    LaunchedEffect(on) {
+        if (on && !last) {
+            scale.snapTo(0.6f)
+            scale.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
+        }
+        last = on
+    }
+    Box(
+        Modifier
+            .padding(horizontal = 2.dp)
+            .size(width = 60.dp, height = 48.dp)
+            .clip(CircleShape)
+            .bounceClick(pressedScale = 0.85f) {
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn)
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (on) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            if (on) "Aus Favoriten entfernen" else "Zu Favoriten",
+            tint = if (on) Color(0xFFFF4D6D) else Color.White,
+            modifier = Modifier.graphicsLayer { scaleX = scale.value; scaleY = scale.value },
+        )
     }
 }
 

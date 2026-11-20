@@ -21,6 +21,9 @@ data class MediaImage(
     val dateTaken: Long,
     /** Seconds; changes when the file is rewritten, so caches can tell versions apart. */
     val modified: Long,
+    val isFavorite: Boolean = false,
+    /** For trashed items: when the system deletes it for good (ms), else 0. */
+    val expires: Long = 0,
 )
 
 data class Album(
@@ -34,7 +37,8 @@ data class Album(
 object MediaRepository {
     private val collection: Uri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
 
-    suspend fun loadImages(context: Context, bucketId: Long? = null): List<MediaImage> = withContext(Dispatchers.IO) {
+    /** All images, or with [trashed] only those in the system trash. */
+    suspend fun loadImages(context: Context, trashed: Boolean = false): List<MediaImage> = withContext(Dispatchers.IO) {
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
@@ -49,13 +53,15 @@ object MediaRepository {
             MediaStore.Images.Media.DATE_MODIFIED,
             MediaStore.Images.Media.DATE_ADDED,
             MediaStore.Images.Media.ORIENTATION,
+            MediaStore.MediaColumns.IS_FAVORITE,
+            MediaStore.MediaColumns.DATE_EXPIRES,
         )
-        val selection = bucketId?.let { "${MediaStore.Images.Media.BUCKET_ID} = ?" }
-        val args = bucketId?.let { arrayOf(it.toString()) }
         // Sorted below: SQL puts rows without DATE_TAKEN (PNG screenshots, edited copies) last.
-        val sort: String? = null
+        val queryArgs = android.os.Bundle().apply {
+            if (trashed) putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY)
+        }
         val result = ArrayList<MediaImage>()
-        context.contentResolver.query(collection, projection, selection, args, sort)?.use { c ->
+        context.contentResolver.query(collection, projection, queryArgs, null)?.use { c ->
             val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val bucketCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
@@ -69,6 +75,8 @@ object MediaRepository {
             val modCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
             val addedCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
             val orientCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.ORIENTATION)
+            val favCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.IS_FAVORITE)
+            val expCol = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_EXPIRES)
             while (c.moveToNext()) {
                 val id = c.getLong(idCol)
                 // DATE_ADDED survives an overwrite, so a replaced original keeps its place in the list.
@@ -89,6 +97,8 @@ object MediaRepository {
                     size = c.getLong(sizeCol),
                     dateTaken = taken,
                     modified = c.getLong(modCol),
+                    isFavorite = c.getInt(favCol) == 1,
+                    expires = c.getLong(expCol) * 1000,
                 )
             }
         }
