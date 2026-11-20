@@ -57,6 +57,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -81,6 +82,8 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-gif:3.6.3")
     // Video thumbnails in the grid.
     implementation("io.coil-kt.coil3:coil-video:3.6.3")
+    // Map tiles in the photo info (OpenStreetMap), cached on disk.
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     // PlayerSurface: video in Compose without a View that would swallow the pager's swipes.
     implementation("androidx.media3:media3-ui-compose:1.11.1")

@@ -361,58 +361,6 @@ private fun PillIcon(icon: ImageVector, label: String, highlight: Boolean = fals
     }
 }
 
-@Composable
-private fun InfoSheet(item: ViewerItem) {
-    val ctx = LocalContext.current
-    val exif by produceState<List<Pair<String, String>>>(emptyList(), item.uri) {
-        value = if (item.isVideo) emptyList() else withContext(Dispatchers.IO) { readExifSummary(ctx, item.uri) }
-    }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
-        Text(item.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 4.dp, bottom = 16.dp))
-        val rows = buildList {
-            if (item.date > 0) add(Triple(Icons.Rounded.CalendarMonth, "Datum", DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.SHORT).format(Date(item.date))))
-            if (item.isVideo && item.duration > 0) add(Triple(Icons.Rounded.PlayCircle, "Länge", formatDuration(item.duration)))
-            if (item.width > 0) add(Triple(Icons.Rounded.AspectRatio, "Auflösung", "${item.width} × ${item.height} · ${"%.1f".format(item.width * item.height / 1e6)} MP"))
-            if (item.size > 0) add(Triple(Icons.Rounded.Storage, "Größe", "${Formatter.formatFileSize(ctx, item.size)} · ${item.mimeType.substringAfter('/').uppercase()}"))
-            item.path?.let { add(Triple(Icons.Rounded.Folder, "Ordner", it)) }
-            exif.forEach { (k, v) -> add(Triple(if (k == "Kamera") Icons.Rounded.PhotoCamera else Icons.Rounded.Camera, k, v)) }
-        }
-        rows.forEach { (icon, k, v) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(22.dp)) }
-                Column(Modifier.padding(start = 14.dp)) {
-                    Text(k, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(v, style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-        }
-    }
-}
-
-
-private fun readExifSummary(ctx: Context, uri: Uri): List<Pair<String, String>> = runCatching {
-    ctx.contentResolver.openInputStream(uri)?.use { input ->
-        val e = ExifInterface(input)
-        buildList {
-            val camera = listOfNotNull(e.getAttribute(ExifInterface.TAG_MAKE), e.getAttribute(ExifInterface.TAG_MODEL))
-                .joinToString(" ").trim()
-            if (camera.isNotEmpty()) add("Kamera" to camera)
-            val parts = buildList {
-                e.getAttributeDouble(ExifInterface.TAG_F_NUMBER, 0.0).takeIf { it > 0 }?.let { add("f/%.1f".format(it)) }
-                e.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, 0.0).takeIf { it > 0 }?.let {
-                    add(if (it < 1) "1/${(1 / it).toInt()} s" else "%.1f s".format(it))
-                }
-                e.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)?.let { add("ISO $it") }
-                e.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, 0.0).takeIf { it > 0 }?.let { add("%.0f mm".format(it)) }
-            }
-            if (parts.isNotEmpty()) add("Belichtung" to parts.joinToString(" · "))
-        }
-    }
-}.getOrNull().orEmpty()
-
 fun share(ctx: Context, uris: List<Uri>, mime: String = "image/*") {
     val intent = if (uris.size == 1) {
         Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uris[0])
