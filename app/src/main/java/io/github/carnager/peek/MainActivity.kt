@@ -183,8 +183,13 @@ class MainActivity : ComponentActivity() {
         openReviewIfAsked(intent)
     }
 
-    /** The evening notification opens the review. */
+    /** The evening notification opens the review; one about shared photos, their album. */
     private fun openReviewIfAsked(intent: Intent?) {
+        val album = intent?.getLongExtra(io.github.carnager.peek.trunk.SharedNews.EXTRA_ALBUM, -1L) ?: -1L
+        if (album >= 0) {
+            intent?.removeExtra(io.github.carnager.peek.trunk.SharedNews.EXTRA_ALBUM)
+            vm.openTrunkAlbum(album)
+        }
         if (intent?.getBooleanExtra(io.github.carnager.peek.review.Review.EXTRA_START, false) == true) {
             intent.removeExtra(io.github.carnager.peek.review.Review.EXTRA_START) // not again on rotation
             vm.startReview()

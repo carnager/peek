@@ -344,14 +344,17 @@ private fun TabBar(vm: GalleryViewModel, grids: Map<Tab, LazyGridState>) {
                 selected = vm.tab == t,
                 onClick = { if (vm.tab == t) scope.launch { grids.getValue(t).animateScrollToItem(0) } else vm.selectTab(t) },
                 icon = {
-                    Icon(
-                        when (t) {
-                            Tab.Phone -> Icons.Rounded.Smartphone
-                            Tab.Trunk -> Icons.Rounded.Cloud
-                            Tab.Folders -> Icons.Rounded.Folder
-                        },
-                        null,
-                    )
+                    val n = if (t == Tab.Trunk) vm.trunkUnseenCount else 0
+                    BadgedBox(badge = { if (n > 0) Badge { Text(if (n > 99) "99+" else "$n") } }) {
+                        Icon(
+                            when (t) {
+                                Tab.Phone -> Icons.Rounded.Smartphone
+                                Tab.Trunk -> Icons.Rounded.Cloud
+                                Tab.Folders -> Icons.Rounded.Folder
+                            },
+                            null,
+                        )
+                    }
                 },
                 label = { Text(stringResource(t.label)) },
             )
@@ -546,7 +549,7 @@ private fun TrunkHeader(vm: GalleryViewModel) {
 @Composable
 private fun TrunkStripCard(vm: GalleryViewModel, a: io.github.carnager.peek.trunk.RemoteAlbum) {
     val images = remember(a, vm.trunk, vm.trunkShared) { vm.trunkAlbumImages(a) }
-    StripCard(a.title(LocalContext.current), countLabel(images.size), images.firstOrNull(), Icons.Rounded.PhotoAlbum, shared = a.shared && !a.direct) {
+    StripCard(a.title(LocalContext.current), countLabel(images.size), images.firstOrNull(), Icons.Rounded.PhotoAlbum, shared = a.shared && !a.direct, new = vm.trunkUnseen[a.id]?.size ?: 0) {
         vm.open = Source.TrunkAlbum(a.id)
     }
 }
@@ -579,6 +582,8 @@ private fun StripCard(
     icon: ImageVector,
     tint: Color = MaterialTheme.colorScheme.primary,
     shared: Boolean = false,
+    /** Photos others put in it that are not seen yet. */
+    new: Int = 0,
     onClick: () -> Unit,
 ) {
     Box(
@@ -598,6 +603,14 @@ private fun StripCard(
         Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(title, color = fg, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, color = fg.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        }
+        if (new > 0) {
+            Text(
+                stringResource(R.string.gallery_new_count, new),
+                color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary).padding(horizontal = 8.dp, vertical = 2.dp),
+            )
         }
         if (shared) {
             Icon(

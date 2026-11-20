@@ -91,6 +91,13 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
                     item { Row(stringResource(R.string.settings_server), stringResource(R.string.settings_server_sub, TrunkAccount.user.toString(), TrunkAccount.baseUrl?.substringAfter("://").toString())) }
                     item { Row(stringResource(R.string.settings_upload_size), limitLabel) { uploadLimit = true } }
                     item { Row(stringResource(R.string.settings_links), stringResource(R.string.settings_links_sub)) { showLinks = true } }
+                    item {
+                        var notifyShared by remember { mutableStateOf(io.github.carnager.peek.trunk.SharedNews.enabled(ctx)) }
+                        SwitchRow(stringResource(R.string.settings_notify_shared), stringResource(R.string.settings_notify_shared_sub), notifyShared) {
+                            notifyShared = it
+                            io.github.carnager.peek.trunk.SharedNews.setEnabled(ctx, it)
+                        }
+                    }
                     item { Row(stringResource(R.string.settings_logout), stringResource(R.string.settings_logout_sub), tint = MaterialTheme.colorScheme.error) { vm.trunkLogout() } }
                 } else {
                     item { Row(stringResource(R.string.settings_connect), stringResource(R.string.settings_connect_sub)) { connecting = true } }

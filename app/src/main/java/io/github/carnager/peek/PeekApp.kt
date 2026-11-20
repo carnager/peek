@@ -18,6 +18,8 @@ class PeekApp : Application(), SingletonImageLoader.Factory {
         UploadWorker.createChannel(this)
         io.github.carnager.peek.review.Review.createChannel(this)
         io.github.carnager.peek.review.Review.schedule(this)
+        io.github.carnager.peek.trunk.SharedNews.createChannel(this)
+        io.github.carnager.peek.trunk.SharedNews.schedule(this)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

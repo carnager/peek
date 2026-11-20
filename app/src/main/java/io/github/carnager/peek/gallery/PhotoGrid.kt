@@ -247,6 +247,8 @@ fun PhotoGridScreen(
     val isTrunk = source.onTrunk
     val trunkAlbum = (source as? Source.TrunkAlbum)?.let { s -> vm.trunkAlbums.firstOrNull { it.id == s.id } }
     LaunchedEffect(source) { if (isTrunk) vm.openTrunk() }
+    // Opening an album sees what others put in it, also what arrives while it is open.
+    if (source is Source.TrunkAlbum) LaunchedEffect(source, vm.trunkUnseen) { vm.markSharedSeen(source.id) }
     val userAlbum = (source as? Source.User)?.let { s -> vm.userAlbums.firstOrNull { it.id == s.id } }
     // The whole trunk library can be searched, filtered and sorted.
     val library = source == Source.Trunk

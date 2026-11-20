@@ -266,4 +266,5 @@
         <item quantity="one">%1$d Bild korrigiert</item>
         <item quantity="other">%1$d Bilder korrigiert</item>
     </plurals>
+    <string name="gallery_new_count">%1$d neu</string>
 </resources>

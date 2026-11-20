@@ -100,4 +100,15 @@
     <string name="trunk_error_no_upload_address">The server returned no upload address</string>
     <string name="trunk_album_from">From %1$s</string>
     <string name="trunk_album_to">To %1$s</string>
+    <string name="trunk_shared_channel">Shared photos</string>
+    <plurals name="trunk_shared_sent">
+        <item quantity="one">%1$s sent you a photo</item>
+        <item quantity="other">%1$s sent you %2$d photos</item>
+    </plurals>
+    <plurals name="trunk_shared_added">
+        <item quantity="one">%1$d new photo in %2$s</item>
+        <item quantity="other">%1$d new photos in %2$s</item>
+    </plurals>
+    <string name="settings_notify_shared">Shared photos</string>
+    <string name="settings_notify_shared_sub">Tell me when someone sends me photos or adds to a shared album; peek looks about once an hour</string>
 </resources>

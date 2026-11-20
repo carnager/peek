@@ -195,8 +195,15 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     var trunkShared by mutableStateOf<Map<Long, List<MediaImage>>>(emptyMap())
         private set
 
+    /** Others' photos not seen yet: album id → photo ids (trunk ids). */
+    var trunkUnseen by mutableStateOf<Map<Long, Set<Long>>>(emptyMap())
+        private set
+    val trunkUnseenCount: Int get() = trunkUnseen.values.sumOf { it.size }
+
     private suspend fun loadShared() {
-        trunkShared = TrunkLibrary.sharedAssets(getApplication()).mapValues { e -> e.value.map { it.toImage() } }
+        val raw = TrunkLibrary.sharedAssets(getApplication())
+        trunkShared = raw.mapValues { e -> e.value.map { it.toImage() } }
+        trunkUnseen = io.github.carnager.peek.trunk.SharedNews.unseen(getApplication(), TrunkLibrary.cachedAlbums(getApplication()), raw)
     }
 
     /** An album's photos in its order: ours from the library, others' from the shared contents. Trashed ones left out. */
@@ -338,6 +345,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 TrunkLibrary.clear(getApplication())
                 TrunkClient.login(getApplication(), address, user, password)
                 trunkConnected = true
+                io.github.carnager.peek.trunk.SharedNews.schedule(getApplication())
                 done(null)
                 openTrunk()
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -356,6 +364,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             TrunkLibrary.clear(getApplication())
             io.github.carnager.peek.trunk.TrunkFiles.clear(getApplication())
             trunkConnected = false
+            io.github.carnager.peek.trunk.SharedNews.schedule(getApplication())
             trunkAll = emptyList()
             trunkAlbums = emptyList()
             if (open.onTrunk) open = null
@@ -609,6 +618,22 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         trunkAll = TrunkLibrary.cached(getApplication()).map { it.toImage() }
         selection = emptySet()
         message = Message(plural(R.plurals.gallery_adjusted, ids.size, ids.size))
+    }
+
+    /** An album was opened: what others put in it is seen. */
+    fun markSharedSeen(albumId: Long) {
+        val ids = trunkUnseen[albumId] ?: return
+        io.github.carnager.peek.trunk.SharedNews.markSeen(getApplication(), albumId, ids)
+        trunkUnseen = trunkUnseen - albumId
+    }
+
+    /** Opens a trunk album, as from a notification. */
+    fun openTrunkAlbum(id: Long) {
+        viewerIndex = null
+        review = null
+        settingsOpen = false
+        selectTab(Tab.Trunk)
+        open = Source.TrunkAlbum(id)
     }
 
     /** Takes photos out of trunk's trash again. */

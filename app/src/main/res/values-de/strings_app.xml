@@ -100,4 +100,15 @@
     <string name="trunk_error_no_upload_address">Server gab keine Upload-Adresse zurück</string>
     <string name="trunk_album_from">Von %1$s</string>
     <string name="trunk_album_to">An %1$s</string>
+    <string name="trunk_shared_channel">Geteilte Bilder</string>
+    <plurals name="trunk_shared_sent">
+        <item quantity="one">%1$s hat dir ein Bild geschickt</item>
+        <item quantity="other">%1$s hat dir %2$d Bilder geschickt</item>
+    </plurals>
+    <plurals name="trunk_shared_added">
+        <item quantity="one">%1$d neues Bild in %2$s</item>
+        <item quantity="other">%1$d neue Bilder in %2$s</item>
+    </plurals>
+    <string name="settings_notify_shared">Geteilte Bilder</string>
+    <string name="settings_notify_shared_sub">Bescheid geben, wenn mir jemand Bilder schickt oder etwas in ein geteiltes Album legt; peek schaut etwa stündlich nach</string>
 </resources>
