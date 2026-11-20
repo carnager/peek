@@ -125,6 +125,8 @@ data class ViewerItem(
     val remote: Boolean = false,
     /** Edited on trunk, so the edit can be dropped again. */
     val edited: Boolean = false,
+    /** Someone else's photo, seen in a shared album: to look at and share, not to change. */
+    val owner: String? = null,
     /** A screen-sized rendition to show instead of loading [uri] in full. */
     val previewUrl: String? = null,
     /** Metadata already known (from the server), so the info sheet need not read the file. */
@@ -287,7 +289,7 @@ fun ImageViewer(
                                 onClick = { menu = false; onAddToAlbum(current) },
                             )
                         }
-                        if (onRevertEdit != null && current.edited) {
+                        if (onRevertEdit != null && current.edited && current.owner == null) {
                             DropdownMenuItem(
                                 text = { Text("Bearbeitung verwerfen") },
                                 leadingIcon = { Icon(Icons.Rounded.Restore, null) },
@@ -320,11 +322,11 @@ fun ImageViewer(
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
                     PillIcon(Icons.Rounded.Share, "Teilen") { onShare?.invoke(current) ?: share(ctx, listOf(current.uri), current.mimeType) }
-                    if (onFavorite != null) {
+                    if (onFavorite != null && current.owner == null) {
                         FavoriteIcon(current.favorite) { onFavorite(current) }
                     }
-                    if (!current.isVideo) PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
-                    if (onDelete != null) PillIcon(Icons.Rounded.DeleteOutline, "Löschen") { onDelete(current) }
+                    if (!current.isVideo && current.owner == null) PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
+                    if (onDelete != null && current.owner == null) PillIcon(Icons.Rounded.DeleteOutline, "Löschen") { onDelete(current) }
                     PillIcon(Icons.Rounded.Info, "Info") { info = current }
                 }
             }
@@ -336,7 +338,7 @@ fun ImageViewer(
         ModalBottomSheet(onDismissRequest = { info = null }, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
             // The live item, so a caption just saved shows at once.
             val live = items.firstOrNull { it.uri == item.uri } ?: item
-            InfoSheet(live, onCaption = onCaption?.takeIf { live.remote }?.let { save -> { c: String -> save(live, c) } })
+            InfoSheet(live, onCaption = onCaption?.takeIf { live.remote && live.owner == null }?.let { save -> { c: String -> save(live, c) } })
         }
     }
 }

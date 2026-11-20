@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.material.icons.rounded.Close
@@ -83,6 +84,7 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
     duration = duration,
     remote = remote != null,
     edited = remote?.edited == true,
+    owner = remote?.owner,
     previewUrl = remote?.takeIf { !it.isVideo }?.let { io.github.carnager.peek.trunk.TrunkAccount.thumbUrl(it, "preview") },
     meta = remote?.let { r ->
         io.github.carnager.peek.viewer.PhotoMeta(
@@ -293,7 +295,6 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
     val upload = rememberUploadProgress(vm)
     // The server's albums show here too: load the cached library, then ask what changed.
     LaunchedEffect(vm.trunkConnected) { if (vm.trunkConnected) vm.openTrunk() }
-    val trunkByRemote = remember(vm.trunk) { vm.trunk.associateBy { it.remote!!.id } }
     // Re-checked on every recomposition, so returning from the settings page updates it.
     var canManage by remember { mutableStateOf(ops.canManageMedia) }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
@@ -399,10 +400,11 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
                     }
                 }
                 items(vm.trunkAlbums, key = { "t:" + it.id }) { a ->
-                    val cover = remember(a.assetIds, trunkByRemote) { vm.trunkCoverOf(a, trunkByRemote) }
-                    val count = remember(a.assetIds, trunkByRemote) { a.assetIds.count { it in trunkByRemote } }
+                    val images = remember(a, vm.trunk, vm.trunkShared) { vm.trunkAlbumImages(a) }
+                    val cover = images.firstOrNull()
+                    val count = images.size
                     if (cover != null) {
-                        AlbumCard(a.name, count, cover, Modifier.animateItem()) { vm.open = Source.TrunkAlbum(a.id) }
+                        AlbumCard(a.name, count, cover, Modifier.animateItem(), shared = a.shared) { vm.open = Source.TrunkAlbum(a.id) }
                     } else {
                         EmptyAlbumCard(a.name, Modifier.animateItem()) { vm.open = Source.TrunkAlbum(a.id) }
                     }
@@ -510,7 +512,7 @@ private fun ManageMediaHint(onAllow: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun AlbumCard(name: String, count: Int, cover: MediaImage, modifier: Modifier = Modifier, aspect: Float = 1f, onClick: () -> Unit) {
+private fun AlbumCard(name: String, count: Int, cover: MediaImage, modifier: Modifier = Modifier, aspect: Float = 1f, shared: Boolean = false, onClick: () -> Unit) {
     Box(
         modifier
             .fillMaxWidth()
@@ -534,6 +536,12 @@ private fun AlbumCard(name: String, count: Int, cover: MediaImage, modifier: Mod
                 overflow = TextOverflow.Ellipsis,
             )
             Text(if (count == 1) "1 Bild" else "$count Bilder", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+        }
+        if (shared) {
+            Icon(
+                Icons.Rounded.Group, "Geteilt", tint = Color.White,
+                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(28.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).padding(5.dp),
+            )
         }
     }
 }

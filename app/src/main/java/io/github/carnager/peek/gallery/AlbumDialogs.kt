@@ -38,7 +38,6 @@ fun AddToAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () -> Unit) {
 @Composable
 private fun TrunkAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () -> Unit) {
     var creating by remember { mutableStateOf(false) }
-    val byRemote = remember(vm.trunk) { vm.trunk.associateBy { it.remote!!.id } }
     val remoteIds = remember(ids, vm.trunk) { val byId = vm.trunk.associateBy { it.id }; ids.mapNotNull { byId[it]?.remote?.id } }
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -50,12 +49,13 @@ private fun TrunkAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () ->
             )
             LazyColumn(Modifier.heightIn(max = 420.dp)) {
                 item { NewAlbumRow { creating = true } }
-                items(vm.trunkAlbums, key = { it.id }) { a ->
-                    val cover = remember(a.assetIds, byRemote) { vm.trunkCoverOf(a, byRemote) }
+                // Albums we may add to: our own, and shared ones that let us.
+                items(vm.trunkAlbums.filter { it.canAdd }, key = { it.id }) { a ->
+                    val cover = remember(a, vm.trunk, vm.trunkShared) { vm.trunkCoverOf(a) }
                     val already = remoteIds.all { it in a.assetIds }
                     AlbumRow(
                         title = a.name,
-                        subtitle = if (already) "Schon enthalten" else "${a.assetIds.count { it in byRemote }} Bilder",
+                        subtitle = if (already) "Schon enthalten" else listOfNotNull(a.owner?.let { "von $it" }, "${a.assetIds.size} Bilder").joinToString(" · "),
                         leading = { AlbumThumb(cover) },
                         trailing = if (already) ({ Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary) }) else null,
                     ) {
@@ -191,4 +191,65 @@ fun NameDialog(title: String, initial: String, confirm: String, onDismiss: () ->
         confirmButton = { Button(onClick = { onConfirm(name.text) }, enabled = ok) { Text(confirm) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
     )
+}
+
+/**
+ * Shares a trunk album within the household: everyone with an account on the server is listed;
+ * a tick shares, and each member either only looks or may add photos of their own.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShareAlbumSheet(vm: GalleryViewModel, album: io.github.carnager.peek.trunk.RemoteAlbum, onDone: () -> Unit) {
+    var people by remember { mutableStateOf<List<Pair<Long, String>>?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        try {
+            people = vm.household()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            failed = true
+        }
+    }
+    // The live album, so ticks follow what the server says.
+    val current = vm.trunkAlbums.firstOrNull { it.id == album.id } ?: album
+    ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
+            Text("„${current.name}“ teilen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Mit den anderen Konten auf deinem trunk. Sie sehen das Album; mit „Hinzufügen“ können sie eigene Fotos dazulegen.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
+            )
+            val list = people
+            when {
+                failed -> Text("trunk nicht erreichbar", color = MaterialTheme.colorScheme.error)
+                list == null -> CircularProgressIndicator(Modifier.padding(16.dp).align(Alignment.CenterHorizontally))
+                list.isEmpty() -> Text(
+                    "Auf diesem trunk gibt es noch keine anderen Konten. Anlegen mit: trunk user add NAME",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                else -> list.forEach { (id, name) ->
+                    val m = current.members.firstOrNull { it.id == id }
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = m != null, onCheckedChange = { on -> if (on) vm.trunkShare(current.id, id, true) else vm.trunkUnshare(current.id, id) })
+                        Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 8.dp))
+                        if (m != null) {
+                            SingleChoiceSegmentedButtonRow {
+                                SegmentedButton(
+                                    selected = !m.canAdd, onClick = { if (m.canAdd) vm.trunkShare(current.id, id, false) },
+                                    shape = SegmentedButtonDefaults.itemShape(0, 2), label = { Text("Ansehen") },
+                                )
+                                SegmentedButton(
+                                    selected = m.canAdd, onClick = { if (!m.canAdd) vm.trunkShare(current.id, id, true) },
+                                    shape = SegmentedButtonDefaults.itemShape(1, 2), label = { Text("Hinzufügen") },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

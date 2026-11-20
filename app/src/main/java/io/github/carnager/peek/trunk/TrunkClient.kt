@@ -120,6 +120,8 @@ data class RemoteAsset(
     val region: String?,
     val country: String?,
     val caption: String?,
+    /** Set for someone else's photo, seen in a shared album: look, don't touch. */
+    val owner: String?,
     val json: JSONObject,
 ) {
     /** "Wien, Österreich", or null without a known place. */
@@ -175,24 +177,48 @@ data class RemoteAsset(
                 region = o.optJSONObject("place")?.optString("region")?.ifEmpty { null },
                 country = o.optJSONObject("place")?.optString("country")?.ifEmpty { null },
                 caption = s("caption"),
+                owner = s("owner"),
                 json = o,
             )
         }
     }
 }
 
-/** An album on the server: an ordered list of asset ids. */
+/** Someone an album is shared with. */
+data class AlbumMember(val id: Long, val name: String, val canAdd: Boolean)
+
+/** An album on the server: an ordered list of asset ids, perhaps shared within the household. */
 data class RemoteAlbum(
     val id: Long,
+    val seq: Long,
     val name: String,
     val assetIds: List<Long>,
     val createdAt: String,
+    /** Set when someone else owns it and shares it with us. */
+    val owner: String?,
+    val members: List<AlbumMember>,
+    val canAdd: Boolean,
     val json: JSONObject,
 ) {
+    val isOwner get() = owner == null
+    /** Shared in either direction: its photos are not all ours, so they are fetched with the album. */
+    val shared get() = owner != null || members.isNotEmpty()
+
     companion object {
         fun parse(o: JSONObject): RemoteAlbum {
             val ids = o.optJSONArray("asset_ids") ?: JSONArray()
-            return RemoteAlbum(o.getLong("id"), o.optString("name"), List(ids.length()) { ids.getLong(it) }, o.optString("created_at"), o)
+            val ms = o.optJSONArray("members") ?: JSONArray()
+            return RemoteAlbum(
+                id = o.getLong("id"),
+                seq = o.optLong("seq"),
+                name = o.optString("name"),
+                assetIds = List(ids.length()) { ids.getLong(it) },
+                createdAt = o.optString("created_at"),
+                owner = o.optJSONObject("owner")?.optString("name"),
+                members = List(ms.length()) { i -> ms.getJSONObject(i).let { AlbumMember(it.getLong("id"), it.optString("name"), it.optBoolean("can_add")) } },
+                canAdd = o.optString("role") != "member" || o.optBoolean("can_add"),
+                json = o,
+            )
         }
     }
 }
@@ -297,6 +323,27 @@ object TrunkClient {
     suspend fun deleteAlbum(id: Long) = withContext(Dispatchers.IO) {
         call(Request.Builder().url(TrunkAccount.api("/albums/$id")).delete().build())
     }
+
+    /** All assets of an album, also other people's in a shared one. */
+    fun albumAssets(id: Long): JSONArray =
+        call(Request.Builder().url(TrunkAccount.api("/albums/$id/assets")).build()).optJSONArray("assets") ?: JSONArray()
+
+    /** The other accounts on the server, to share with: id to name. */
+    suspend fun users(): List<Pair<Long, String>> = withContext(Dispatchers.IO) {
+        val arr = call(Request.Builder().url(TrunkAccount.api("/users")).build()).optJSONArray("users") ?: JSONArray()
+        List(arr.length()) { i -> arr.getJSONObject(i).let { it.getLong("id") to it.optString("name") } }
+    }
+
+    suspend fun setMember(albumId: Long, userId: Long, canAdd: Boolean): JSONObject = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/albums/$albumId/members/$userId")).put(JSONObject().put("can_add", canAdd).toString().toRequestBody(json)).build())
+    }
+
+    /** Stops sharing with [userId]; with our own id, leaves the album. */
+    suspend fun removeMember(albumId: Long, userId: Long) = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/albums/$albumId/members/$userId")).delete().build())
+    }
+
+    suspend fun me(): JSONObject = withContext(Dispatchers.IO) { call(Request.Builder().url(TrunkAccount.api("/me")).build()) }
 
     suspend fun setCaption(id: Long, caption: String): JSONObject = withContext(Dispatchers.IO) {
         call(Request.Builder().url(TrunkAccount.api("/assets/$id")).patch(JSONObject().put("caption", caption).toString().toRequestBody(json)).build())

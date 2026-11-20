@@ -175,6 +175,25 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var trunkAlbums by mutableStateOf<List<io.github.carnager.peek.trunk.RemoteAlbum>>(emptyList())
         private set
+    /** Contents of shared albums, by album id: other people's photos are not in [trunk]. */
+    var trunkShared by mutableStateOf<Map<Long, List<MediaImage>>>(emptyMap())
+        private set
+
+    private suspend fun loadShared() {
+        trunkShared = TrunkLibrary.sharedAssets(getApplication()).mapValues { e -> e.value.map { it.toImage() } }
+    }
+
+    /** An album's photos in its order: ours from the library, others' from the shared contents. Trashed ones left out. */
+    fun trunkAlbumImages(album: io.github.carnager.peek.trunk.RemoteAlbum): List<MediaImage> {
+        val own = trunkByRemote
+        val shared = trunkShared[album.id]?.associateBy { it.remote!!.id } ?: emptyMap()
+        return album.assetIds.mapNotNull { own[it] ?: shared[it]?.takeIf { s -> !s.remote!!.trashed } }
+    }
+
+    private val trunkByRemote by androidx.compose.runtime.derivedStateOf { trunk.associateBy { it.remote!!.id } }
+
+    /** Our account's id on trunk, to leave shared albums. */
+    private var myTrunkId: Long? = null
 
     /** On this day in earlier years: from trunk's library when connected, else from the phone. */
     val memories: OnThisDay? by androidx.compose.runtime.derivedStateOf {
@@ -240,6 +259,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
             trunkAlbums = TrunkLibrary.cachedAlbums(getApplication())
+            loadShared()
             syncTrunk()
         }
     }
@@ -251,6 +271,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 trunk = TrunkLibrary.sync(getApplication()).map { it.toImage() }
                 trunkAlbums = TrunkLibrary.cachedAlbums(getApplication())
+                loadShared()
                 if (open is Source.TrunkAlbum && trunkAlbums.none { it.id == (open as Source.TrunkAlbum).id }) {
                     open = null // deleted on another device
                     viewerIndex = null
@@ -327,24 +348,57 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun trunkFavorite(images: List<MediaImage>, favorite: Boolean) = trunkCall {
-        images.mapNotNull { it.remote }.forEach { TrunkLibrary.put(getApplication(), TrunkClient.setFavorite(it.id, favorite)) }
+        ownOnly(images).mapNotNull { it.remote }.forEach { TrunkLibrary.put(getApplication(), TrunkClient.setFavorite(it.id, favorite)) }
         trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
     }
 
     // Albums on trunk. Images carry negative ids (see toImage); the server wants its own.
 
     private fun remoteIds(imageIds: Collection<Long>): List<Long> {
-        val byId = trunk.associateBy { it.id }
-        return imageIds.mapNotNull { byId[it]?.remote?.id }
+        val byId = (trunk + trunkShared.values.flatten()).associateBy { it.id }
+        return imageIds.mapNotNull { byId[it]?.remote?.id }.distinct()
     }
 
     private suspend fun applyAlbum(o: org.json.JSONObject?, deletedId: Long? = null) {
         trunkAlbums = TrunkLibrary.putAlbum(getApplication(), o, deletedId)
+        loadShared()
     }
 
-    /** First photo of a trunk album that is still in the library, for its card. */
-    fun trunkCoverOf(album: io.github.carnager.peek.trunk.RemoteAlbum, byRemote: Map<Long, MediaImage>): MediaImage? =
-        album.assetIds.firstNotNullOfOrNull { byRemote[it] }
+    /** First photo of a trunk album, for its card. */
+    fun trunkCoverOf(album: io.github.carnager.peek.trunk.RemoteAlbum): MediaImage? = trunkAlbumImages(album).firstOrNull()
+
+    /** Only our own photos can be changed; others' in a shared album are just to look at. */
+    private fun ownOnly(images: List<MediaImage>): List<MediaImage> {
+        val (own, foreign) = images.partition { it.remote?.owner == null }
+        if (foreign.isNotEmpty()) {
+            val who = foreign.mapNotNull { it.remote?.owner }.distinct().joinToString(", ")
+            message = Message(if (own.isEmpty()) "Gehört $who – nur ansehen" else "${foreign.size} von $who übersprungen")
+        }
+        return own
+    }
+
+    // Sharing within the household.
+
+    suspend fun household(): List<Pair<Long, String>> = TrunkClient.users()
+
+    fun trunkShare(albumId: Long, userId: Long, canAdd: Boolean) = trunkCall {
+        applyAlbum(TrunkClient.setMember(albumId, userId, canAdd))
+    }
+
+    fun trunkUnshare(albumId: Long, userId: Long) = trunkCall {
+        TrunkClient.removeMember(albumId, userId)
+        syncTrunk()
+    }
+
+    /** Leaves an album someone else shares with us. */
+    fun trunkLeave(albumId: Long) = trunkCall {
+        val me = myTrunkId ?: TrunkClient.me().getLong("id").also { myTrunkId = it }
+        val name = trunkAlbums.firstOrNull { it.id == albumId }?.name ?: ""
+        TrunkClient.removeMember(albumId, me)
+        applyAlbum(null, deletedId = albumId)
+        if (open == Source.TrunkAlbum(albumId)) open = null
+        message = Message("„$name“ verlassen")
+    }
 
     fun trunkCreateAlbum(name: String, imageIds: List<Long> = emptyList(), then: (Long) -> Unit = {}) = trunkCall {
         val o = TrunkClient.createAlbum(name.trim(), remoteIds(imageIds))
@@ -403,7 +457,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun trunkTrash(images: List<MediaImage>) = trunkCall {
-        val ids = images.mapNotNull { it.remote?.id }
+        val ids = ownOnly(images).mapNotNull { it.remote?.id }
         if (ids.isEmpty()) return@trunkCall
         TrunkClient.trash(ids)
         selection = emptySet()
@@ -425,13 +479,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         }
         Source.Trunk -> trunkView
         is Source.Memories -> memories?.images ?: emptyList()
-        is Source.TrunkAlbum -> {
-            val album = trunkAlbums.firstOrNull { it.id == source.id }
-            if (album == null) emptyList() else {
-                val byRemote = trunk.associateBy { it.remote!!.id }
-                album.assetIds.mapNotNull { byRemote[it] }
-            }
-        }
+        is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.let(::trunkAlbumImages) ?: emptyList()
     }
 
     val openImages: List<MediaImage> get() = imagesOf(open)

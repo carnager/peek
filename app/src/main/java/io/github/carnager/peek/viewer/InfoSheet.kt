@@ -174,6 +174,7 @@ fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
             overflow = TextOverflow.MiddleEllipsis,
             modifier = Modifier.padding(top = 6.dp),
         )
+        item.owner?.let { Text("Foto von $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp)) }
 
         // Caption: shown when there is one; editable where the photo lives on trunk.
         var editCaption by remember { mutableStateOf(false) }

@@ -18,6 +18,8 @@ object TrunkLibrary {
     private val lock = Mutex()
     private val byId = LinkedHashMap<Long, RemoteAsset>()
     private val albums = LinkedHashMap<Long, RemoteAlbum>()
+    /** Contents of shared albums (other people's photos are not in our feed), with the album seq they are from. */
+    private val shared = HashMap<Long, Pair<Long, List<RemoteAsset>>>()
     private var cursor = 0L
     private var owner: String? = null
     private var loaded = false
@@ -32,6 +34,7 @@ object TrunkLibrary {
         if (loaded && owner == currentOwner()) return
         byId.clear()
         albums.clear()
+        shared.clear()
         cursor = 0
         owner = currentOwner()
         loaded = true
@@ -44,6 +47,12 @@ object TrunkLibrary {
             for (i in 0 until arr.length()) RemoteAsset.parse(arr.getJSONObject(i)).let { byId[it.id] = it }
             val al = o.optJSONArray("albums") ?: JSONArray()
             for (i in 0 until al.length()) RemoteAlbum.parse(al.getJSONObject(i)).let { albums[it.id] = it }
+            val sh = o.optJSONObject("shared") ?: JSONObject()
+            for (k in sh.keys()) {
+                val e = sh.getJSONObject(k)
+                val list = e.getJSONArray("assets")
+                shared[k.toLong()] = e.getLong("seq") to List(list.length()) { RemoteAsset.parse(list.getJSONObject(it)) }
+            }
         }
     }
 
@@ -52,7 +61,9 @@ object TrunkLibrary {
         byId.values.forEach { arr.put(it.json) }
         val al = JSONArray()
         albums.values.forEach { al.put(it.json) }
-        val o = JSONObject().put("version", CACHE_VERSION).put("owner", owner).put("cursor", cursor).put("assets", arr).put("albums", al)
+        val sh = JSONObject()
+        shared.forEach { (id, e) -> sh.put(id.toString(), JSONObject().put("seq", e.first).put("assets", JSONArray().apply { e.second.forEach { put(it.json) } })) }
+        val o = JSONObject().put("version", CACHE_VERSION).put("owner", owner).put("cursor", cursor).put("assets", arr).put("albums", al).put("shared", sh)
         val tmp = File(dir(ctx), "library.json.tmp")
         tmp.writeText(o.toString())
         tmp.renameTo(file(ctx))
@@ -82,9 +93,30 @@ object TrunkLibrary {
             loadCache(ctx)
             if (o != null) RemoteAlbum.parse(o).let { albums[it.id] = it }
             if (deletedId != null) albums.remove(deletedId)
+            runCatching { refreshShared() }
             saveCache(ctx)
             albumSnapshot()
         }
+    }
+
+    /** Photos of shared albums, by album id. */
+    suspend fun sharedAssets(ctx: Context): Map<Long, List<RemoteAsset>> = withContext(Dispatchers.IO) {
+        lock.withLock {
+            loadCache(ctx)
+            shared.mapValues { it.value.second }
+        }
+    }
+
+    /** Fetches the contents of shared albums that changed since we last did; forgets the rest. */
+    private fun refreshShared(): Boolean {
+        var changed = shared.keys.retainAll { id -> albums[id]?.shared == true }
+        for (a in albums.values) {
+            if (!a.shared || shared[a.id]?.first == a.seq) continue
+            val arr = TrunkClient.albumAssets(a.id)
+            shared[a.id] = a.seq to List(arr.length()) { RemoteAsset.parse(arr.getJSONObject(it)) }
+            changed = true
+        }
+        return changed
     }
 
     private fun snapshot() = byId.values.filter { !it.trashed }.sortedWith(compareByDescending<RemoteAsset> { it.takenAt }.thenByDescending { it.id })
@@ -113,6 +145,7 @@ object TrunkLibrary {
                 cursor = page.cursor
                 more = page.more
             }
+            if (refreshShared()) changed = true
             if (changed) saveCache(ctx)
             snapshot()
         }
@@ -131,6 +164,7 @@ object TrunkLibrary {
         lock.withLock {
             byId.clear()
             albums.clear()
+            shared.clear()
             cursor = 0
             loaded = false
             file(ctx).delete()

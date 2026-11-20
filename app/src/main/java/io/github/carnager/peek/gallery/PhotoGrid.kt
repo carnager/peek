@@ -244,6 +244,7 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
     val selected = remember(list, vm.selection) { list.filter { it.id in vm.selection } }
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
     var confirmEmpty by remember { mutableStateOf(false) }
     fun closeSearch() {
         searchOpen = false
@@ -333,16 +334,35 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                         if (trunkAlbum != null) Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Mehr") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
-                                DropdownMenuItem(
-                                    text = { Text("Umbenennen") },
-                                    leadingIcon = { Icon(Icons.Rounded.Edit, null) },
-                                    onClick = { menu = false; renaming = true },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Album löschen") },
-                                    leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
-                                    onClick = { menu = false; vm.trunkDeleteAlbum(trunkAlbum.id) },
-                                )
+                                if (trunkAlbum.isOwner) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (trunkAlbum.members.isEmpty()) "Teilen" else "Geteilt mit ${trunkAlbum.members.size}") },
+                                        leadingIcon = { Icon(Icons.Rounded.Group, null) },
+                                        onClick = { menu = false; sharing = true },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Umbenennen") },
+                                        leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                                        onClick = { menu = false; renaming = true },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Album löschen") },
+                                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
+                                        onClick = { menu = false; vm.trunkDeleteAlbum(trunkAlbum.id) },
+                                    )
+                                } else {
+                                    DropdownMenuItem(
+                                        text = { Text("Geteilt von ${trunkAlbum.owner}") },
+                                        leadingIcon = { Icon(Icons.Rounded.Group, null) },
+                                        onClick = { menu = false },
+                                        enabled = false,
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Album verlassen") },
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Logout, null) },
+                                        onClick = { menu = false; vm.trunkLeave(trunkAlbum.id) },
+                                    )
+                                }
                             }
                         }
                     } else if (isTrash && list.isNotEmpty()) {
@@ -550,6 +570,7 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
             renaming = false
         }
     }
+    if (sharing && trunkAlbum != null) ShareAlbumSheet(vm, trunkAlbum) { sharing = false }
     if (renaming && trunkAlbum != null) {
         NameDialog("Album umbenennen", trunkAlbum.name, "Speichern", onDismiss = { renaming = false }) {
             vm.trunkRenameAlbum(trunkAlbum.id, it)
