@@ -109,6 +109,9 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
 
 @Composable
 fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
+    // Sheets the viewer opens for trunk photos.
+    var viewerSend by remember { mutableStateOf<List<MediaImage>?>(null) }
+    var viewerLink by remember { mutableStateOf<List<MediaImage>?>(null) }
     val ctx = LocalContext.current
     val albumsGrid = rememberLazyGridState()
     val snackbar = remember { SnackbarHostState() }
@@ -192,6 +195,12 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                             onCaption = if (!vm.open.onTrunk) null else { item, caption ->
                                 list.firstOrNull { it.uri == item.uri }?.let { vm.trunkCaption(it, caption) }
                             },
+                            onSend = if (!vm.open.onTrunk) null else { item ->
+                                list.firstOrNull { it.uri == item.uri }?.let { viewerSend = listOf(it) }
+                            },
+                            onLink = if (!vm.open.onTrunk) null else { item ->
+                                list.firstOrNull { it.uri == item.uri }?.let { viewerLink = listOf(it) }
+                            },
                             onRevertEdit = if (!vm.open.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { vm.trunkRevertEdit(it) }
                             },
@@ -252,6 +261,8 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
     vm.addToAlbum?.let { ids ->
         AddToAlbumSheet(vm, ids) { vm.addToAlbum = null }
     }
+    viewerSend?.let { SendSheet(vm, it) { viewerSend = null } }
+    viewerLink?.let { LinkSheet(vm, null, it, "Foto") { viewerLink = null } }
 }
 
 /** Where the viewer shows [image] when it is fitted to the screen. */
@@ -389,7 +400,7 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
                         }
                     }
                 }
-                if (vm.trunkAlbums.isEmpty()) {
+                if (vm.trunkAlbums.none { !it.direct }) {
                     item(key = "trunkAlbumsEmpty", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             "Alben auf dem Server sehen alle deine Geräte. Wähle Bilder in trunk aus und tippe auf „Album“.",
@@ -399,15 +410,14 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
                         )
                     }
                 }
-                items(vm.trunkAlbums, key = { "t:" + it.id }) { a ->
-                    val images = remember(a, vm.trunk, vm.trunkShared) { vm.trunkAlbumImages(a) }
-                    val cover = images.firstOrNull()
-                    val count = images.size
-                    if (cover != null) {
-                        AlbumCard(a.name, count, cover, Modifier.animateItem(), shared = a.shared) { vm.open = Source.TrunkAlbum(a.id) }
-                    } else {
-                        EmptyAlbumCard(a.name, Modifier.animateItem()) { vm.open = Source.TrunkAlbum(a.id) }
-                    }
+                items(vm.trunkAlbums.filter { !it.direct }, key = { "t:" + it.id }) { a ->
+                    TrunkAlbumCard(vm, a, Modifier.animateItem())
+                }
+                // Photos sent between people: "Von alice", "An bob".
+                val direct = vm.trunkAlbums.filter { it.direct }
+                if (direct.isNotEmpty()) {
+                    item(key = "directHeader", span = { GridItemSpan(maxLineSpan) }) { SectionHeader("Geteilt") }
+                    items(direct, key = { "d:" + it.id }) { a -> TrunkAlbumCard(vm, a, Modifier.animateItem()) }
                 }
             }
             item(key = "albumsHeader", span = { GridItemSpan(maxLineSpan) }) {
@@ -460,6 +470,17 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
     }
     if (connecting) {
         TrunkConnectDialog(vm, onDone = { connecting = false; if (vm.trunkConnected) vm.open = Source.Trunk })
+    }
+}
+
+@Composable
+private fun TrunkAlbumCard(vm: GalleryViewModel, a: io.github.carnager.peek.trunk.RemoteAlbum, modifier: Modifier) {
+    val images = remember(a, vm.trunk, vm.trunkShared) { vm.trunkAlbumImages(a) }
+    val cover = images.firstOrNull()
+    if (cover != null) {
+        AlbumCard(a.title, images.size, cover, modifier, shared = a.shared && !a.direct) { vm.open = Source.TrunkAlbum(a.id) }
+    } else {
+        EmptyAlbumCard(a.title, modifier) { vm.open = Source.TrunkAlbum(a.id) }
     }
 }
 

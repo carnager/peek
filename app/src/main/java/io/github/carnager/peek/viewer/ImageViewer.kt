@@ -29,6 +29,8 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Share
@@ -146,6 +148,9 @@ fun ImageViewer(
     onSwipeClose: ((offsetY: Float, scale: Float, backdrop: Float) -> Unit)? = null,
     onFavorite: ((ViewerItem) -> Unit)? = null,
     onAddToAlbum: ((ViewerItem) -> Unit)? = null,
+    /** trunk: send to someone in the household, or make a public link. Only for our own photos. */
+    onSend: ((ViewerItem) -> Unit)? = null,
+    onLink: ((ViewerItem) -> Unit)? = null,
     /** Replaces the built-in share, e.g. to fetch a server original first. */
     onShare: ((ViewerItem) -> Unit)? = null,
     /** Offered for [ViewerItem.edited] items: go back to the first upload. */
@@ -282,6 +287,20 @@ fun ImageViewer(
                             leadingIcon = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null) },
                             onClick = { menu = false; openWith(ctx, current) },
                         )
+                        if (onSend != null && current.owner == null) {
+                            DropdownMenuItem(
+                                text = { Text("An Person senden") },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Send, null) },
+                                onClick = { menu = false; onSend(current) },
+                            )
+                        }
+                        if (onLink != null && current.owner == null) {
+                            DropdownMenuItem(
+                                text = { Text("Link erstellen") },
+                                leadingIcon = { Icon(Icons.Rounded.Link, null) },
+                                onClick = { menu = false; onLink(current) },
+                            )
+                        }
                         if (onAddToAlbum != null) {
                             DropdownMenuItem(
                                 text = { Text("Zu Album hinzufügen") },

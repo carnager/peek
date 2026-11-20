@@ -61,6 +61,9 @@ object TrunkAccount {
     /** The current file: the edit, if there is one. */
     fun fileUrl(a: RemoteAsset) = api("/assets/${a.id}/file?v=${a.version}")
 
+    /** Full address of a public link from its "path". */
+    fun linkUrl(path: String) = "$baseUrl$path"
+
     /** Whether a request goes to our server, so the token may be attached. */
     fun owns(url: String): Boolean = baseUrl?.let { url.startsWith("$it/") } ?: false
 }
@@ -198,9 +201,19 @@ data class RemoteAlbum(
     val owner: String?,
     val members: List<AlbumMember>,
     val canAdd: Boolean,
+    /** Photos one person sent another, rather than an album. */
+    val direct: Boolean,
     val json: JSONObject,
 ) {
     val isOwner get() = owner == null
+
+    /** How to call it: its name, or for sent photos "Von alice" / "An bob". */
+    val title: String
+        get() = when {
+            !direct -> name
+            owner != null -> "Von $owner"
+            else -> "An $name"
+        }
     /** Shared in either direction: its photos are not all ours, so they are fetched with the album. */
     val shared get() = owner != null || members.isNotEmpty()
 
@@ -217,6 +230,7 @@ data class RemoteAlbum(
                 owner = o.optJSONObject("owner")?.optString("name"),
                 members = List(ms.length()) { i -> ms.getJSONObject(i).let { AlbumMember(it.getLong("id"), it.optString("name"), it.optBoolean("can_add")) } },
                 canAdd = o.optString("role") != "member" || o.optBoolean("can_add"),
+                direct = o.optString("kind") == "direct",
                 json = o,
             )
         }
@@ -344,6 +358,27 @@ object TrunkClient {
     }
 
     suspend fun me(): JSONObject = withContext(Dispatchers.IO) { call(Request.Builder().url(TrunkAccount.api("/me")).build()) }
+
+    /** Sends photos to someone in the household; returns the album of what we sent them. */
+    suspend fun sendTo(userId: Long, assetIds: List<Long>): JSONObject = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("user_id", userId).put("asset_ids", JSONArray(assetIds))
+        call(Request.Builder().url(TrunkAccount.api("/shares")).post(body.toString().toRequestBody(json)).build())
+    }
+
+    /** A public link to an album or to some photos. Its address is the server's plus "path". */
+    suspend fun createLink(albumId: Long?, assetIds: List<Long>?, title: String, download: Boolean, expiresDays: Int): JSONObject = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("title", title).put("download", download).put("expires_days", expiresDays)
+        if (albumId != null) body.put("album_id", albumId) else body.put("asset_ids", JSONArray(assetIds))
+        call(Request.Builder().url(TrunkAccount.api("/links")).post(body.toString().toRequestBody(json)).build())
+    }
+
+    suspend fun links(): JSONArray = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/links")).build()).optJSONArray("links") ?: JSONArray()
+    }
+
+    suspend fun revokeLink(token: String) = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/links/$token")).delete().build())
+    }
 
     suspend fun setCaption(id: Long, caption: String): JSONObject = withContext(Dispatchers.IO) {
         call(Request.Builder().url(TrunkAccount.api("/assets/$id")).patch(JSONObject().put("caption", caption).toString().toRequestBody(json)).build())

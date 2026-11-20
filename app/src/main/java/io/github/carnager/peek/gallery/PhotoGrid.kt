@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -245,6 +246,9 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
+    var sending by remember { mutableStateOf<List<MediaImage>?>(null) }
+    var linking by remember { mutableStateOf<Pair<Long?, List<MediaImage>>?>(null) }
+    var confirmEnd by remember { mutableStateOf(false) }
     var confirmEmpty by remember { mutableStateOf(false) }
     fun closeSearch() {
         searchOpen = false
@@ -334,7 +338,22 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                         if (trunkAlbum != null) Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Mehr") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
-                                if (trunkAlbum.isOwner) {
+                                if (trunkAlbum.direct) {
+                                    if (trunkAlbum.isOwner) DropdownMenuItem(
+                                        text = { Text("Teilen beenden") },
+                                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
+                                        onClick = { menu = false; confirmEnd = true },
+                                    ) else DropdownMenuItem(
+                                        text = { Text("Ausblenden") },
+                                        leadingIcon = { Icon(Icons.Rounded.VisibilityOff, null) },
+                                        onClick = { menu = false; vm.trunkLeave(trunkAlbum.id) },
+                                    )
+                                } else if (trunkAlbum.isOwner) {
+                                    DropdownMenuItem(
+                                        text = { Text("Link teilen") },
+                                        leadingIcon = { Icon(Icons.Rounded.Link, null) },
+                                        onClick = { menu = false; linking = trunkAlbum.id to emptyList() },
+                                    )
                                     DropdownMenuItem(
                                         text = { Text(if (trunkAlbum.members.isEmpty()) "Teilen" else "Geteilt mit ${trunkAlbum.members.size}") },
                                         leadingIcon = { Icon(Icons.Rounded.Group, null) },
@@ -520,6 +539,8 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                                 vm.trunkFavorite(selected, !allFav)
                             }
                             PillAction(Icons.Rounded.PhotoAlbum, "Album") { vm.addToAlbum = selected.map { it.id } }
+                            PillAction(Icons.AutoMirrored.Rounded.Send, "Senden") { sending = selected }
+                            PillAction(Icons.Rounded.Link, "Link") { linking = null to selected }
                             if (trunkAlbum != null) {
                                 PillAction(Icons.Rounded.RemoveCircleOutline, "Entfernen") {
                                     vm.trunkRemoveFrom(trunkAlbum.id, selected.map { it.id })
@@ -571,6 +592,23 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
         }
     }
     if (sharing && trunkAlbum != null) ShareAlbumSheet(vm, trunkAlbum) { sharing = false }
+    sending?.let { imgs -> SendSheet(vm, imgs) { sending = null } }
+    linking?.let { (albumId, imgs) ->
+        LinkSheet(vm, albumId, imgs, if (albumId != null) trunkAlbum?.name ?: "Fotos" else "Fotos") {
+            linking = null
+            vm.selection = emptySet()
+        }
+    }
+    if (confirmEnd && trunkAlbum != null) {
+        AlertDialog(
+            onDismissRequest = { confirmEnd = false },
+            shape = RoundedCornerShape(28.dp),
+            title = { Text("Teilen mit ${trunkAlbum.name} beenden?") },
+            text = { Text("${trunkAlbum.name} sieht diese Bilder dann nicht mehr. Bei dir bleiben sie.") },
+            confirmButton = { TextButton(onClick = { confirmEnd = false; vm.trunkEndDirect(trunkAlbum.id) }) { Text("Beenden") } },
+            dismissButton = { TextButton(onClick = { confirmEnd = false }) { Text("Abbrechen") } },
+        )
+    }
     if (renaming && trunkAlbum != null) {
         NameDialog("Album umbenennen", trunkAlbum.name, "Speichern", onDismiss = { renaming = false }) {
             vm.trunkRenameAlbum(trunkAlbum.id, it)

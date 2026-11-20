@@ -40,6 +40,7 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
     var uploadLimit by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
     var limitLabel by remember { mutableStateOf(uploadLimitLabel()) }
+    var showLinks by remember { mutableStateOf(false) }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Scaffold(
@@ -84,6 +85,7 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
                 if (vm.trunkConnected) {
                     item { Row("Server", "${TrunkAccount.user} auf ${TrunkAccount.baseUrl?.substringAfter("://")}") }
                     item { Row("Upload-Größe", limitLabel) { uploadLimit = true } }
+                    item { Row("Öffentliche Links", "Ansehen, erneut teilen, zurückziehen") { showLinks = true } }
                     item { Row("Abmelden", "Dieses Gerät von trunk abmelden", tint = MaterialTheme.colorScheme.error) { vm.trunkLogout() } }
                 } else {
                     item { Row("Mit trunk verbinden", "Fotos sichern und auf allen Geräten sehen") { connecting = true } }
@@ -147,6 +149,7 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
         limitLabel = uploadLimitLabel()
     }
     if (connecting) TrunkConnectDialog(vm, onDone = { connecting = false })
+    if (showLinks) io.github.carnager.peek.gallery.LinksSheet(vm) { showLinks = false }
 }
 
 @Composable

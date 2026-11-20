@@ -390,6 +390,30 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         syncTrunk()
     }
 
+    /** Sends our own photos to someone in the household. */
+    fun trunkSendTo(userId: Long, name: String, images: List<MediaImage>) = trunkCall {
+        val ids = remoteIds(ownOnly(images).map { it.id })
+        if (ids.isEmpty()) return@trunkCall
+        applyAlbum(TrunkClient.sendTo(userId, ids))
+        selection = emptySet()
+        message = Message(if (ids.size == 1) "1 Bild an $name gesendet" else "${ids.size} Bilder an $name gesendet")
+    }
+
+    /** Makes a public link and returns its address; for an album, or for our own photos among [images]. */
+    suspend fun trunkCreateLink(albumId: Long?, images: List<MediaImage>, title: String, download: Boolean, expiresDays: Int): String {
+        val ids = if (albumId == null) remoteIds(ownOnly(images).map { it.id }) else null
+        if (albumId == null && ids.isNullOrEmpty()) error("Keine eigenen Bilder ausgewählt")
+        val o = TrunkClient.createLink(albumId, ids, title, download, expiresDays)
+        return TrunkAccount.linkUrl(o.getString("path"))
+    }
+
+    /** Stops sending photos to someone: their album of what we sent goes away. */
+    fun trunkEndDirect(albumId: Long) = trunkCall {
+        TrunkClient.deleteAlbum(albumId)
+        applyAlbum(null, deletedId = albumId)
+        if (open == Source.TrunkAlbum(albumId)) open = null
+    }
+
     /** Leaves an album someone else shares with us. */
     fun trunkLeave(albumId: Long) = trunkCall {
         val me = myTrunkId ?: TrunkClient.me().getLong("id").also { myTrunkId = it }
@@ -492,7 +516,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         is Source.Folder -> folders.firstOrNull { it.bucketId == source.bucketId }?.name ?: ""
         is Source.User -> userAlbums.firstOrNull { it.id == source.id }?.name ?: ""
         Source.Trunk -> "trunk"
-        is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.name ?: ""
+        is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.title ?: ""
         is Source.Memories -> memories?.title ?: "Rückblick"
     }
 

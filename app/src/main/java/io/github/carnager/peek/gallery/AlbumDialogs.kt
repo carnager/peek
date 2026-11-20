@@ -13,6 +13,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PhotoAlbum
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,7 +51,7 @@ private fun TrunkAlbumSheet(vm: GalleryViewModel, ids: List<Long>, onDone: () ->
             LazyColumn(Modifier.heightIn(max = 420.dp)) {
                 item { NewAlbumRow { creating = true } }
                 // Albums we may add to: our own, and shared ones that let us.
-                items(vm.trunkAlbums.filter { it.canAdd }, key = { it.id }) { a ->
+                items(vm.trunkAlbums.filter { it.canAdd && !it.direct }, key = { it.id }) { a ->
                     val cover = remember(a, vm.trunk, vm.trunkShared) { vm.trunkCoverOf(a) }
                     val already = remoteIds.all { it in a.assetIds }
                     AlbumRow(
@@ -252,4 +253,196 @@ fun ShareAlbumSheet(vm: GalleryViewModel, album: io.github.carnager.peek.trunk.R
             }
         }
     }
+}
+
+/** Picks someone in the household to send [images] to. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SendSheet(vm: GalleryViewModel, images: List<MediaImage>, onDone: () -> Unit) {
+    var people by remember { mutableStateOf<List<Pair<Long, String>>?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        try {
+            people = vm.household()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            failed = true
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Text(
+                if (images.size == 1) "Senden an …" else "${images.size} Bilder senden an …",
+                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            val list = people
+            when {
+                failed -> Text("trunk nicht erreichbar", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))
+                list == null -> CircularProgressIndicator(Modifier.padding(24.dp).align(Alignment.CenterHorizontally))
+                list.isEmpty() -> Text(
+                    "Auf deinem trunk gibt es noch niemanden außer dir. Anlegen mit: trunk user add NAME",
+                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 24.dp),
+                )
+                else -> list.forEach { (id, name) ->
+                    AlbumRow(
+                        title = name,
+                        subtitle = "Sieht die Bilder unter „Geteilt“",
+                        leading = {
+                            Box(
+                                Modifier.size(52.dp).clip(RoundedCornerShape(26.dp)).background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center,
+                            ) { Text(name.take(1).uppercase(), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSecondaryContainer) }
+                        },
+                    ) {
+                        vm.trunkSendTo(id, name, images)
+                        onDone()
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Makes a public link to an album ([albumId]) or to [images]. Asks for a title, whether originals
+ * may be downloaded (they carry the location) and how long it lasts; then offers to share it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LinkSheet(vm: GalleryViewModel, albumId: Long?, images: List<MediaImage>, defaultTitle: String, onDone: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var title by remember { mutableStateOf(defaultTitle) }
+    var download by remember { mutableStateOf(true) }
+    var days by remember { mutableIntStateOf(0) }
+    var busy by remember { mutableStateOf(false) }
+    var url by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
+            Text("Öffentlicher Link", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Jeder mit dem Link sieht diese Bilder im Browser, ohne Konto. Du kannst ihn jederzeit zurückziehen.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
+            )
+            val done = url
+            if (done == null) {
+                OutlinedTextField(title, { title = it }, label = { Text("Titel") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(12.dp)).bounceClick(pressedScale = 0.98f) { download = !download },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Download erlauben", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "Originale enthalten den Aufnahmeort. Ohne Download gibt es nur die Ansicht.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = download, onCheckedChange = null)
+                }
+                Text("Gültig", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    listOf(0 to "Unbegrenzt", 7 to "7 Tage", 30 to "30 Tage").forEachIndexed { i, (d, label) ->
+                        SegmentedButton(selected = days == d, onClick = { days = d }, shape = SegmentedButtonDefaults.itemShape(i, 3), label = { Text(label) })
+                    }
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
+                Button(
+                    onClick = {
+                        busy = true
+                        error = null
+                        scope.launch {
+                            try {
+                                url = vm.trunkCreateLink(albumId, images, title.trim().ifEmpty { defaultTitle }, download, days)
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                error = e.message ?: "Link konnte nicht erstellt werden"
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(52.dp),
+                ) { Text("Link erstellen") }
+            } else {
+                Text(done, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = { shareLink(ctx, title, done) }, modifier = Modifier.weight(1f)) { Text("Teilen") }
+                    OutlinedButton(onClick = {
+                        copyLink(ctx, done)
+                        vm.message = Message("Link kopiert")
+                    }, modifier = Modifier.weight(1f)) { Text("Kopieren") }
+                }
+            }
+        }
+    }
+}
+
+/** The live public links, to share again or revoke. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LinksSheet(vm: GalleryViewModel, onDone: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var links by remember { mutableStateOf<List<org.json.JSONObject>?>(null) }
+    suspend fun load() {
+        links = runCatching { io.github.carnager.peek.trunk.TrunkClient.links().let { a -> List(a.length()) { a.getJSONObject(it) } } }.getOrElse { emptyList() }
+    }
+    LaunchedEffect(Unit) { load() }
+    ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
+            Text("Öffentliche Links", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+            val list = links
+            when {
+                list == null -> CircularProgressIndicator(Modifier.padding(16.dp).align(Alignment.CenterHorizontally))
+                list.isEmpty() -> Text("Keine aktiven Links.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else -> LazyColumn(Modifier.heightIn(max = 480.dp)) {
+                    items(list, key = { it.getString("token") }) { l ->
+                        val url = io.github.carnager.peek.trunk.TrunkAccount.linkUrl(l.getString("path"))
+                        val n = l.optJSONArray("asset_ids")?.length() ?: 0
+                        val count = if (l.has("album_id")) "Album" else if (n == 1) "1 Bild" else "$n Bilder"
+                        val until = l.optString("expires_at").takeIf { it.isNotEmpty() }?.let {
+                            runCatching { java.text.DateFormat.getDateInstance().format(java.util.Date(java.time.Instant.parse(it).toEpochMilli())) }.getOrNull()
+                        }
+                        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                            Text(l.optString("title"), style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                listOfNotNull(count, until?.let { "bis $it" } ?: "unbegrenzt", if (l.optBoolean("download")) "mit Download" else "nur ansehen").joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                TextButton(onClick = { shareLink(ctx, l.optString("title"), url) }) { Text("Teilen") }
+                                TextButton(onClick = {
+                                    scope.launch {
+                                        runCatching { io.github.carnager.peek.trunk.TrunkClient.revokeLink(l.getString("token")) }
+                                            .onSuccess { vm.message = Message("Link zurückgezogen") }
+                                            .onFailure { vm.message = Message("trunk: ${it.message}") }
+                                        load()
+                                    }
+                                }) { Text("Zurückziehen", color = MaterialTheme.colorScheme.error) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun shareLink(ctx: android.content.Context, title: String, url: String) {
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+        .putExtra(android.content.Intent.EXTRA_SUBJECT, title)
+        .putExtra(android.content.Intent.EXTRA_TEXT, url)
+    ctx.startActivity(android.content.Intent.createChooser(send, "Link teilen"))
+}
+
+private fun copyLink(ctx: android.content.Context, url: String) {
+    val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("trunk", url))
 }
