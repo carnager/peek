@@ -154,24 +154,41 @@ fun ImageViewer(
     val drag = remember { Animatable(0f) }
     var zoomed by remember { mutableStateOf(false) }
     val dismissPx = with(LocalDensity.current) { 140.dp.toPx() }
-    val progress = (abs(drag.value) / (dismissPx * 2.5f)).coerceIn(0f, 1f)
+    // Only pulling down shrinks and fades towards closing; pulling up is the info gesture.
+    val progress = (drag.value.coerceAtLeast(0f) / (dismissPx * 2.5f)).coerceIn(0f, 1f)
 
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 1f - progress))
             .draggable(
-                state = rememberDraggableState { d -> if (!zoomed) scope.launch { drag.snapTo(drag.value + d) } },
+                state = rememberDraggableState { d ->
+                    if (zoomed) return@rememberDraggableState
+                    // Upwards the photo moves at half speed, like something with a bit of weight.
+                    val step = if (drag.value + d < 0f) d * 0.5f else d
+                    scope.launch { drag.snapTo(drag.value + step) }
+                },
                 orientation = Orientation.Vertical,
                 enabled = !zoomed,
                 onDragStarted = { chrome = false },
                 onDragStopped = { velocity ->
-                    if (abs(drag.value) > dismissPx || abs(velocity) > 2500f) {
-                        val p = (abs(drag.value) / (dismissPx * 2.5f)).coerceIn(0f, 1f)
-                        onSwipeClose?.invoke(drag.value, 1f - p * 0.25f, 1f - p) ?: onClose()
-                    } else {
-                        chrome = true
-                        drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+                    val y = drag.value
+                    when {
+                        // Down: close.
+                        y > dismissPx || (y > 0f && velocity > 2500f) -> {
+                            val p = (y / (dismissPx * 2.5f)).coerceIn(0f, 1f)
+                            onSwipeClose?.invoke(y, 1f - p * 0.25f, 1f - p) ?: onClose()
+                        }
+                        // Up: show the info and let the photo settle back.
+                        y < -dismissPx * 0.35f || (y < 0f && velocity < -2000f) -> {
+                            info = items[pager.currentPage.coerceIn(0, items.lastIndex)]
+                            chrome = true
+                            drag.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
+                        }
+                        else -> {
+                            chrome = true
+                            drag.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+                        }
                     }
                 },
             )
