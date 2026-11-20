@@ -51,7 +51,30 @@ data class Stroke(
     val marker: Boolean,
     /** A straight arrow from the first to the last point. */
     val arrow: Boolean = false,
+    /** Paints the image itself, disguised, instead of a colour. */
+    val effect: BrushEffect = BrushEffect.NONE,
 )
+
+enum class BrushEffect { NONE, PIXELATE, BLUR }
+
+/**
+ * Tiny disguised copies of the image for the pixelate and blur brushes. They are sized relative
+ * to the image, so the preview and the full-resolution result look the same, and stretched back
+ * up when painted: without filtering for big square blocks, with filtering for a soft blur.
+ */
+class StrokeEffects(val pixel: android.graphics.Bitmap, val blur: android.graphics.Bitmap) {
+    companion object {
+        fun of(base: android.graphics.Bitmap): StrokeEffects {
+            fun shrink(shortSide: Int): android.graphics.Bitmap {
+                val f = shortSide.toFloat() / min(base.width, base.height)
+                val w = (base.width * f).toInt().coerceAtLeast(1)
+                val h = (base.height * f).toInt().coerceAtLeast(1)
+                return ImageOps.resize(base, w, h)
+            }
+            return StrokeEffects(pixel = shrink(42), blur = shrink(22))
+        }
+    }
+}
 
 object OverlayRenderer {
 
@@ -163,7 +186,7 @@ object OverlayRenderer {
         return kotlin.math.abs(lx) <= bw / 2 + slop && kotlin.math.abs(ly) <= bh / 2 + slop
     }
 
-    fun drawStroke(canvas: Canvas, stroke: Stroke, ox: Float, oy: Float, w: Float, h: Float) {
+    fun drawStroke(canvas: Canvas, stroke: Stroke, ox: Float, oy: Float, w: Float, h: Float, effects: StrokeEffects? = null) {
         if (stroke.points.isEmpty()) return
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = stroke.color
@@ -172,6 +195,22 @@ object OverlayRenderer {
             strokeJoin = Paint.Join.ROUND
             strokeCap = if (stroke.marker) Paint.Cap.SQUARE else Paint.Cap.ROUND
             if (stroke.marker) alpha = 110
+        }
+        if (stroke.effect != BrushEffect.NONE) {
+            val src = (if (stroke.effect == BrushEffect.PIXELATE) effects?.pixel else effects?.blur) ?: return
+            paint.color = android.graphics.Color.BLACK
+            paint.strokeCap = Paint.Cap.ROUND
+            paint.shader = android.graphics.BitmapShader(src, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP).apply {
+                setLocalMatrix(android.graphics.Matrix().apply {
+                    setScale(w / src.width, h / src.height)
+                    postTranslate(ox, oy)
+                })
+                // Nearest-neighbour stretching is what makes the blocks; bilinear makes the blur.
+                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    filterMode = if (stroke.effect == BrushEffect.PIXELATE) android.graphics.BitmapShader.FILTER_MODE_NEAREST else android.graphics.BitmapShader.FILTER_MODE_LINEAR
+                }
+            }
+            paint.isFilterBitmap = stroke.effect == BrushEffect.BLUR
         }
         val pts = stroke.points
         if (stroke.arrow) {

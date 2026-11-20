@@ -148,7 +148,8 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         }
         commit { base ->
             ImageOps.drawOver(base) { canvas, w, h ->
-                s.forEach { OverlayRenderer.drawStroke(canvas, it, 0f, 0f, w, h) }
+                val fx = if (s.any { it.effect != BrushEffect.NONE }) StrokeEffects.of(base) else null
+                s.forEach { OverlayRenderer.drawStroke(canvas, it, 0f, 0f, w, h, fx) }
                 t.forEach { OverlayRenderer.drawText(ctx, canvas, it, 0f, 0f, w, h) }
             }
         }

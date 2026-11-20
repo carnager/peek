@@ -37,6 +37,8 @@ import androidx.compose.material.icons.automirrored.rounded.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.rounded.FormatAlignRight
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Brush
+import androidx.compose.material.icons.rounded.GridOn
+import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.ArrowOutward
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
@@ -124,6 +126,9 @@ fun DrawTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
     var width by remember { mutableFloatStateOf(0.012f) }
     // 0 = pen, 1 = marker, 2 = arrow
     var mode by remember { mutableIntStateOf(0) }
+    // 3 = pixelate, 4 = blur: they paint the image itself, so they have no colour.
+    val effectFor = { m: Int -> when (m) { 3 -> BrushEffect.PIXELATE; 4 -> BrushEffect.BLUR; else -> BrushEffect.NONE } }
+    val effects = remember(bmp) { StrokeEffects.of(bmp) }
     val live = remember { mutableStateListOf<Pair<Float, Float>>() }
     var imgRect by remember { mutableStateOf(RectF()) }
     val rect by rememberUpdatedState(imgRect)
@@ -157,31 +162,56 @@ fun DrawTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
                             ch.consume()
                         }
                     }
-                    if (!multi && (mode != 2 || live.size > 1)) vm.strokes += Stroke(live.toList(), color, width, mode == 1, mode == 2)
+                    if (!multi && (mode != 2 || live.size > 1)) vm.strokes += Stroke(live.toList(), color, width, mode == 1, mode == 2, effectFor(mode))
                     live.clear()
                 }
             },
         ) { r ->
             drawIntoCanvas { c ->
-                vm.strokes.forEach { OverlayRenderer.drawStroke(c.nativeCanvas, it, r.left, r.top, r.width(), r.height()) }
-                if (live.isNotEmpty()) OverlayRenderer.drawStroke(c.nativeCanvas, Stroke(live.toList(), color, width, mode == 1, mode == 2), r.left, r.top, r.width(), r.height())
+                vm.strokes.forEach { OverlayRenderer.drawStroke(c.nativeCanvas, it, r.left, r.top, r.width(), r.height(), effects) }
+                if (live.isNotEmpty()) OverlayRenderer.drawStroke(c.nativeCanvas, Stroke(live.toList(), color, width, mode == 1, mode == 2, effectFor(mode)), r.left, r.top, r.width(), r.height(), effects)
             }
         }
         ToolSheet {
-        ColorRow(color) { color = it }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalIconToggleButton(checked = mode == 0, onCheckedChange = { mode = 0 }) { Icon(Icons.Rounded.Brush, "Stift") }
-            FilledTonalIconToggleButton(checked = mode == 1, onCheckedChange = { mode = 1 }) { Icon(Icons.Rounded.Highlight, "Marker") }
-            FilledTonalIconToggleButton(checked = mode == 2, onCheckedChange = { mode = 2 }) { Icon(Icons.Rounded.ArrowOutward, "Pfeil") }
-            // Brush size preview dot.
-            Box(Modifier.width(36.dp), contentAlignment = Alignment.Center) {
-                val d = with(LocalDensity.current) { (width * min(imgRect.width(), imgRect.height())).toDp() }.coerceIn(2.dp, 32.dp)
-                Box(Modifier.size(d).clip(CircleShape).background(Color(color)))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            fun pick(m: Int) {
+                // Disguising needs a broad brush; a pen-sized one would take forever to cover a face.
+                if (m >= 3 && mode < 3 && width < 0.04f) width = 0.05f
+                if (m < 3 && mode >= 3 && width > 0.03f) width = 0.012f
+                mode = m
             }
-            Slider(value = width, onValueChange = { width = it }, valueRange = 0.003f..0.06f, modifier = Modifier.weight(1f))
+            FilledTonalIconToggleButton(checked = mode == 0, onCheckedChange = { pick(0) }) { Icon(Icons.Rounded.Brush, "Stift") }
+            FilledTonalIconToggleButton(checked = mode == 1, onCheckedChange = { pick(1) }) { Icon(Icons.Rounded.Highlight, "Marker") }
+            FilledTonalIconToggleButton(checked = mode == 2, onCheckedChange = { pick(2) }) { Icon(Icons.Rounded.ArrowOutward, "Pfeil") }
+            FilledTonalIconToggleButton(checked = mode == 3, onCheckedChange = { pick(3) }) { Icon(Icons.Rounded.GridOn, "Verpixeln") }
+            FilledTonalIconToggleButton(checked = mode == 4, onCheckedChange = { pick(4) }) { Icon(Icons.Rounded.BlurOn, "Weichzeichnen") }
+            Spacer(Modifier.weight(1f))
             IconButton(onClick = { if (vm.strokes.isNotEmpty()) vm.strokes.removeAt(vm.strokes.lastIndex) }, enabled = vm.strokes.isNotEmpty()) {
                 Icon(Icons.AutoMirrored.Rounded.Undo, "Letzten Strich entfernen")
             }
+        }
+        androidx.compose.animation.AnimatedVisibility(visible = mode < 3) {
+            ColorRow(color) { color = it }
+        }
+        androidx.compose.animation.AnimatedVisibility(visible = mode >= 3) {
+            Text(
+                if (mode == 3) "Verpixeln: über Gesichter, Namen oder Kennzeichen malen" else "Weichzeichnen: über die Stelle malen",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Brush size preview dot.
+            Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
+                val d = with(LocalDensity.current) { (width * min(imgRect.width(), imgRect.height())).toDp() }.coerceIn(2.dp, 36.dp)
+                Box(Modifier.size(d).clip(CircleShape).background(if (mode >= 3) MaterialTheme.colorScheme.onSurfaceVariant else Color(color)))
+            }
+            Slider(value = width, onValueChange = { width = it }, valueRange = 0.003f..0.12f, modifier = Modifier.weight(1f))
         }
         ToolActions(title = "Zeichnen", onCancel = vm::closeTool, onApply = vm::applyOverlays)
         }
