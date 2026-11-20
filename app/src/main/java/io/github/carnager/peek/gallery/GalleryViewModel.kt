@@ -85,8 +85,6 @@ class OnThisDay(val images: List<MediaImage>, val yearsAgo: List<Int>, val whole
     }
 }
 
-/** Shows photos from the trunk server, so actions go there. */
-
 /** How the trunk library is ordered. */
 enum class TrunkSort(val label: String, val byDate: Boolean) {
     Newest("Neueste zuerst", true),
@@ -98,6 +96,9 @@ enum class TrunkSort(val label: String, val byDate: Boolean) {
 
 /** What the trunk library can be narrowed to. */
 enum class TrunkFilter(val label: String) { Photos("Fotos"), Videos("Videos"), Favorites("Favoriten") }
+
+/** The overview's tabs: the phone's photos, the trunk library, the phone's folders. */
+enum class Tab(val label: String) { Phone("Handy"), Trunk("trunk"), Folders("Ordner") }
 
 /** Shows photos from the trunk server, so actions go there. */
 val Source?.onTrunk: Boolean get() = this == Source.Trunk || this is Source.TrunkAlbum || (this is Source.Memories && remote)
@@ -195,10 +196,19 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     /** Our account's id on trunk, to leave shared albums. */
     private var myTrunkId: Long? = null
 
-    /** On this day in earlier years: from trunk's library when connected, else from the phone. */
-    val memories: OnThisDay? by androidx.compose.runtime.derivedStateOf {
-        val remote = trunkConnected && trunk.isNotEmpty()
-        OnThisDay.of(if (remote) trunk else images, java.time.LocalDate.now(), remote)
+    /** On this day in earlier years, from the phone's photos (Handy tab) and from trunk's (trunk tab). */
+    val phoneMemories: OnThisDay? by androidx.compose.runtime.derivedStateOf { OnThisDay.of(images, java.time.LocalDate.now(), false) }
+    val trunkMemories: OnThisDay? by androidx.compose.runtime.derivedStateOf {
+        if (trunkConnected) OnThisDay.of(trunk, java.time.LocalDate.now(), true) else null
+    }
+
+    /** The overview's tab, remembered across launches. */
+    var tab by mutableStateOf(runCatching { Tab.valueOf(prefs.getString("tab", Tab.Phone.name)!!) }.getOrDefault(Tab.Phone))
+        private set
+
+    fun selectTab(t: Tab) {
+        tab = t
+        prefs.edit().putString("tab", t.name).apply()
     }
 
     // Search, filters and order of the trunk library. All offline, on the cached library.
@@ -502,7 +512,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             images.filter { it.id in ids }
         }
         Source.Trunk -> trunkView
-        is Source.Memories -> memories?.images ?: emptyList()
+        is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.images ?: emptyList()
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.let(::trunkAlbumImages) ?: emptyList()
     }
 
@@ -517,7 +527,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         is Source.User -> userAlbums.firstOrNull { it.id == source.id }?.name ?: ""
         Source.Trunk -> "trunk"
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.title ?: ""
-        is Source.Memories -> memories?.title ?: "Rückblick"
+        is Source.Memories -> (if (source.remote) trunkMemories else phoneMemories)?.title ?: "Rückblick"
     }
 
     fun reload(then: (() -> Unit)? = null) {

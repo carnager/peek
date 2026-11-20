@@ -1,5 +1,10 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.foundation.layout.fillMaxSize
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBar
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -24,6 +29,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.AdminPanelSettings
@@ -113,7 +121,8 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
     var viewerSend by remember { mutableStateOf<List<MediaImage>?>(null) }
     var viewerLink by remember { mutableStateOf<List<MediaImage>?>(null) }
     val ctx = LocalContext.current
-    val albumsGrid = rememberLazyGridState()
+    // One scroll position per tab, kept while an album or folder is open.
+    val tabGrids = Tab.entries.associateWith { rememberLazyGridState() }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(vm.message?.token) {
         val m = vm.message ?: return@LaunchedEffect
@@ -134,7 +143,7 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
             },
             label = "albums",
         ) { source ->
-            if (source == null) AlbumsScreen(vm, ops, albumsGrid) else PhotoGridScreen(vm, ops, source)
+            if (source == null) AlbumsScreen(vm, ops, tabGrids) else PhotoGridScreen(vm, ops, source)
         }
 
         // The viewer sits on top of the album so the grid keeps its scroll position underneath.
@@ -298,27 +307,20 @@ private fun closeHero(vm: GalleryViewModel, list: List<MediaImage>, w: Float, h:
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridState) {
+private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, LazyGridState>) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    var creating by remember { mutableStateOf(false) }
-    var creatingTrunk by remember { mutableStateOf(false) }
-    var connecting by remember { mutableStateOf(false) }
-    val upload = rememberUploadProgress(vm)
-    // The server's albums show here too: load the cached library, then ask what changed.
-    LaunchedEffect(vm.trunkConnected) { if (vm.trunkConnected) vm.openTrunk() }
-    // Re-checked on every recomposition, so returning from the settings page updates it.
+    val scope = rememberCoroutineScope()
+    // Re-checked when coming back, so returning from the settings page updates it.
     var canManage by remember { mutableStateOf(ops.canManageMedia) }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
         canManage = ops.canManageMedia
         onPauseOrDispose {}
     }
-    val byId = remember(vm.images) { vm.images.associateBy { it.id } }
-    // When the photos arrive after the cards below them, show the "all photos" card instead of
-    // keeping the list anchored on whatever was first before.
-    val hasImages = vm.images.isNotEmpty()
-    LaunchedEffect(hasImages) {
-        if (hasImages && grid.firstVisibleItemIndex <= 2) grid.scrollToItem(0)
-    }
+    var creating by remember { mutableStateOf(false) }
+    var creatingTrunk by remember { mutableStateOf(false) }
+    var connecting by remember { mutableStateOf(false) }
+    // The server's albums and memories: load the cached library, then ask what changed.
+    LaunchedEffect(vm.trunkConnected) { if (vm.trunkConnected) vm.openTrunk() }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -344,114 +346,50 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
                 ),
             )
         },
-    ) { pad ->
-        // An empty phone still has its way to trunk: only the phone's part says it is empty.
-        val phoneEmpty = vm.loaded && vm.images.isEmpty() && vm.trash.isEmpty()
-        LazyVerticalGrid(
-            state = grid,
-            columns = GridCells.Adaptive(160.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = pad.calculateTopPadding() + 4.dp, bottom = pad.calculateBottomPadding() + 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            if (!canManage && !vm.manageMediaHintDismissed && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                item(key = "hint", span = { GridItemSpan(maxLineSpan) }) {
-                    ManageMediaHint(onAllow = ops::requestManageMedia, onDismiss = vm::dismissManageMediaHint)
-                }
-            }
-            if (phoneEmpty) {
-                item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
-                    Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(io.github.carnager.peek.R.drawable.mascot), null, Modifier.size(width = 120.dp, height = 84.dp))
-                        Spacer(Modifier.height(12.dp))
-                        Text("Noch keine Bilder auf dem Handy", style = MaterialTheme.typography.titleMedium)
-                    }
-                }
-            }
-            if (vm.images.isNotEmpty()) {
-                item(key = "all", span = { GridItemSpan(maxLineSpan) }) {
-                    // Not a screenshot: a screenshot of peek itself would show this very card again.
-                    val cover = remember(vm.images) { vm.images.firstOrNull { !it.isScreenshot } ?: vm.images.first() }
-                    AlbumCard("Alle Bilder", vm.images.size, cover, aspect = 1.8f) { vm.open = Source.All }
-                }
-            }
-            item(key = "quick", span = { GridItemSpan(maxLineSpan) }) {
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    QuickTile(Icons.Rounded.Favorite, "Favoriten", vm.favorites.size, Color(0xFFFF4D6D), Modifier.weight(1f)) { vm.open = Source.Favorites }
-                    QuickTile(Icons.Rounded.DeleteOutline, "Papierkorb", vm.trash.size, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f)) { vm.open = Source.Trash }
-                }
-            }
-
-            vm.memories?.let { m ->
-                item(key = "memories", span = { GridItemSpan(maxLineSpan) }) {
-                    MemoriesCard(m, Modifier.animateItem()) { vm.open = Source.Memories(m.remote) }
-                }
-            }
-            item(key = "trunk", span = { GridItemSpan(maxLineSpan) }) {
-                TrunkCard(vm, upload) { if (vm.trunkConnected) vm.open = Source.Trunk else connecting = true }
-            }
-            if (vm.trunkConnected) {
-                item(key = "trunkAlbumsHeader", span = { GridItemSpan(maxLineSpan) }) {
-                    SectionHeader("Alben auf trunk") {
-                        FilledTonalButton(onClick = { creatingTrunk = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
-                            Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Neu")
-                        }
-                    }
-                }
-                if (vm.trunkAlbums.none { !it.direct }) {
-                    item(key = "trunkAlbumsEmpty", span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            "Alben auf dem Server sehen alle deine Geräte. Wähle Bilder in trunk aus und tippe auf „Album“.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 4.dp),
-                        )
-                    }
-                }
-                items(vm.trunkAlbums.filter { !it.direct }, key = { "t:" + it.id }) { a ->
-                    TrunkAlbumCard(vm, a, Modifier.animateItem())
-                }
-                // Photos sent between people: "Von alice", "An bob".
-                val direct = vm.trunkAlbums.filter { it.direct }
-                if (direct.isNotEmpty()) {
-                    item(key = "directHeader", span = { GridItemSpan(maxLineSpan) }) { SectionHeader("Geteilt") }
-                    items(direct, key = { "d:" + it.id }) { a -> TrunkAlbumCard(vm, a, Modifier.animateItem()) }
-                }
-            }
-            item(key = "albumsHeader", span = { GridItemSpan(maxLineSpan) }) {
-                SectionHeader("Alben") {
-                    FilledTonalButton(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
-                        Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Neu")
-                    }
-                }
-            }
-            if (vm.userAlbums.isEmpty()) {
-                item(key = "albumsEmpty", span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        "Sammle Bilder aus allen Ordnern in eigenen Alben. Die Dateien bleiben, wo sie sind.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp),
+        bottomBar = {
+            NavigationBar {
+                Tab.entries.forEach { t ->
+                    NavigationBarItem(
+                        selected = vm.tab == t,
+                        onClick = {
+                            if (vm.tab == t) {
+                                // Tapping the open tab again goes back to its top.
+                                scope.launch { grids.getValue(t).animateScrollToItem(0) }
+                            } else {
+                                vm.selectTab(t)
+                            }
+                        },
+                        icon = {
+                            Icon(
+                                when (t) {
+                                    Tab.Phone -> Icons.Rounded.Smartphone
+                                    Tab.Trunk -> Icons.Rounded.Cloud
+                                    Tab.Folders -> Icons.Rounded.Folder
+                                },
+                                null,
+                            )
+                        },
+                        label = { Text(t.label) },
                     )
                 }
             }
-            items(vm.userAlbums, key = { "u:" + it.id }) { a ->
-                val cover = remember(a.ids, byId) { a.ids.firstNotNullOfOrNull { byId[it] } }
-                val count = remember(a.ids, byId) { a.ids.count { it in byId } }
-                if (cover != null) {
-                    AlbumCard(a.name, count, cover, Modifier.animateItem()) { vm.open = Source.User(a.id) }
-                } else {
-                    EmptyAlbumCard(a.name, Modifier.animateItem()) { vm.open = Source.User(a.id) }
+        },
+    ) { pad ->
+        val padding = PaddingValues(start = 16.dp, end = 16.dp, top = pad.calculateTopPadding() + 4.dp, bottom = pad.calculateBottomPadding() + 24.dp)
+        AnimatedContent(vm.tab, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { t ->
+            LazyVerticalGrid(
+                state = grids.getValue(t),
+                columns = GridCells.Adaptive(160.dp),
+                contentPadding = padding,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                when (t) {
+                    Tab.Phone -> phoneTab(vm, ops, canManage) { creating = true }
+                    Tab.Trunk -> trunkTab(vm, onConnect = { connecting = true }, onNewAlbum = { creatingTrunk = true })
+                    Tab.Folders -> foldersTab(vm)
                 }
-            }
-
-            item(key = "foldersHeader", span = { GridItemSpan(maxLineSpan) }) { SectionHeader("Ordner") }
-            items(vm.folders, key = { "f:" + it.bucketId }) { a ->
-                AlbumCard(a.name, a.count, a.cover, Modifier.animateItem()) { vm.open = Source.Folder(a.bucketId) }
             }
         }
     }
@@ -471,6 +409,113 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
     if (connecting) {
         TrunkConnectDialog(vm, onDone = { connecting = false; if (vm.trunkConnected) vm.open = Source.Trunk })
     }
+}
+
+/** A grid item across the whole row. */
+private fun full(s: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope) = GridItemSpan(s.maxLineSpan)
+
+/** Handy: the phone's photos, its favourites and trash, memories from them, peek's own albums. */
+private fun androidx.compose.foundation.lazy.grid.LazyGridScope.phoneTab(vm: GalleryViewModel, ops: MediaOps, canManage: Boolean, onNewAlbum: () -> Unit) {
+    if (!canManage && !vm.manageMediaHintDismissed && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        item(key = "hint", span = ::full) {
+            ManageMediaHint(onAllow = ops::requestManageMedia, onDismiss = vm::dismissManageMediaHint)
+        }
+    }
+    if (vm.loaded && vm.images.isEmpty() && vm.trash.isEmpty()) {
+        item(key = "empty", span = ::full) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(io.github.carnager.peek.R.drawable.mascot), null, Modifier.size(width = 120.dp, height = 84.dp))
+                Spacer(Modifier.height(12.dp))
+                Text("Noch keine Bilder auf dem Handy", style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+    if (vm.images.isNotEmpty()) {
+        item(key = "all", span = ::full) {
+            // Not a screenshot: a screenshot of peek itself would show this very card again.
+            val cover = remember(vm.images) { vm.images.firstOrNull { !it.isScreenshot } ?: vm.images.first() }
+            AlbumCard("Alle Bilder", vm.images.size, cover, aspect = 1.8f) { vm.open = Source.All }
+        }
+    }
+    item(key = "quick", span = ::full) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            QuickTile(Icons.Rounded.Favorite, "Favoriten", vm.favorites.size, Color(0xFFFF4D6D), Modifier.weight(1f)) { vm.open = Source.Favorites }
+            QuickTile(Icons.Rounded.DeleteOutline, "Papierkorb", vm.trash.size, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f)) { vm.open = Source.Trash }
+        }
+    }
+    vm.phoneMemories?.let { m ->
+        item(key = "memories", span = ::full) { MemoriesCard(m, Modifier.animateItem()) { vm.open = Source.Memories(false) } }
+    }
+    item(key = "albumsHeader", span = ::full) { SectionHeader("Alben") { NewButton(onNewAlbum) } }
+    if (vm.userAlbums.isEmpty()) {
+        item(key = "albumsEmpty", span = ::full) {
+            Hint("Sammle Bilder aus allen Ordnern in eigenen Alben. Die Dateien bleiben, wo sie sind.")
+        }
+    }
+    items(vm.userAlbums, key = { "u:" + it.id }) { a ->
+        val byId = remember(vm.images) { vm.images.associateBy { it.id } }
+        val cover = remember(a.ids, byId) { a.ids.firstNotNullOfOrNull { byId[it] } }
+        val count = remember(a.ids, byId) { a.ids.count { it in byId } }
+        if (cover != null) {
+            AlbumCard(a.name, count, cover, Modifier.animateItem()) { vm.open = Source.User(a.id) }
+        } else {
+            EmptyAlbumCard(a.name, Modifier.animateItem()) { vm.open = Source.User(a.id) }
+        }
+    }
+}
+
+/** trunk: the library on the server, its memories, its albums and what was sent between people. */
+private fun androidx.compose.foundation.lazy.grid.LazyGridScope.trunkTab(vm: GalleryViewModel, onConnect: () -> Unit, onNewAlbum: () -> Unit) {
+    item(key = "trunk", span = ::full) {
+        val upload = rememberUploadProgress(vm)
+        TrunkCard(vm, upload) { if (vm.trunkConnected) vm.open = Source.Trunk else onConnect() }
+    }
+    if (!vm.trunkConnected) {
+        item(key = "trunkIntro", span = ::full) {
+            Hint("trunk ist dein eigener Server für Fotos und Videos: Sicherung, Alben, Teilen, auf allen Geräten. Verbinde peek oben mit deinem trunk.")
+        }
+        return
+    }
+    vm.trunkMemories?.let { m ->
+        item(key = "memories", span = ::full) { MemoriesCard(m, Modifier.animateItem()) { vm.open = Source.Memories(true) } }
+    }
+    item(key = "trunkAlbumsHeader", span = ::full) { SectionHeader("Alben") { NewButton(onNewAlbum) } }
+    if (vm.trunkAlbums.none { !it.direct }) {
+        item(key = "trunkAlbumsEmpty", span = ::full) {
+            Hint("Alben auf dem Server sehen alle deine Geräte. Wähle Bilder in trunk aus und tippe auf „Album“.")
+        }
+    }
+    items(vm.trunkAlbums.filter { !it.direct }, key = { "t:" + it.id }) { a -> TrunkAlbumCard(vm, a, Modifier.animateItem()) }
+    // Photos sent between people: "Von alice", "An bob".
+    val direct = vm.trunkAlbums.filter { it.direct }
+    if (direct.isNotEmpty()) {
+        item(key = "directHeader", span = ::full) { SectionHeader("Geteilt") }
+        items(direct, key = { "d:" + it.id }) { a -> TrunkAlbumCard(vm, a, Modifier.animateItem()) }
+    }
+}
+
+/** Ordner: the phone's folders. */
+private fun androidx.compose.foundation.lazy.grid.LazyGridScope.foldersTab(vm: GalleryViewModel) {
+    if (vm.folders.isEmpty()) {
+        item(key = "foldersEmpty", span = ::full) { Hint("Noch keine Ordner mit Bildern auf dem Handy.") }
+    }
+    items(vm.folders, key = { "f:" + it.bucketId }) { a ->
+        AlbumCard(a.name, a.count, a.cover, Modifier.animateItem()) { vm.open = Source.Folder(a.bucketId) }
+    }
+}
+
+@Composable
+private fun NewButton(onClick: () -> Unit) {
+    FilledTonalButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 14.dp)) {
+        Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+        Spacer(Modifier.width(4.dp))
+        Text("Neu")
+    }
+}
+
+@Composable
+private fun Hint(text: String) {
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp))
 }
 
 @Composable
