@@ -263,7 +263,7 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
     ) { pad ->
         if (vm.loaded && vm.images.isEmpty() && vm.trash.isEmpty()) {
             Column(Modifier.fillMaxSize().padding(pad), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Rounded.PhotoLibrary, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(io.github.carnager.peek.R.drawable.mascot), null, Modifier.size(width = 120.dp, height = 84.dp))
                 Spacer(Modifier.height(12.dp))
                 Text("Noch keine Bilder hier", style = MaterialTheme.typography.titleMedium)
             }

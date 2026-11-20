@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- peek's elephant on its own, for empty states. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="111dp" android:height="78dp"
+    android:viewportWidth="74" android:viewportHeight="52">
+    <group android:translateX="-17" android:translateY="-24">
+        <path android:fillColor="#4429B8" android:pathData="M20,43 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0 Z M60,43 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0 Z" />
+        <path android:fillColor="#8A73F2" android:pathData="M26.5,44 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0 Z M63.5,44 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0 Z" android:fillAlpha="0.55" />
+        <path android:fillColor="#5B3FD9" android:pathData="M36,48 C36,35 44,28 54,28 C64,28 72,35 72,48 C72,57 64,61 54,61 C44,61 36,57 36,48 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M43.5,43 a4.3,5.2 0 1,0 8.6,0 a4.3,5.2 0 1,0 -8.6,0 Z M55.9,43 a4.3,5.2 0 1,0 8.6,0 a4.3,5.2 0 1,0 -8.6,0 Z" />
+        <path android:fillColor="#1E1B3A" android:pathData="M46.5,44.6 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z M58.9,44.6 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M49.15,43.6 a0.85,0.85 0 1,0 1.7,0 a0.85,0.85 0 1,0 -1.7,0 Z M61.55,43.6 a0.85,0.85 0 1,0 1.7,0 a0.85,0.85 0 1,0 -1.7,0 Z" />
+        <path android:pathData="M54,56 C54.5,62 54,65.5 52.3,68 C50.6,70.5 47,71.5 45.4,69.6" android:strokeColor="#5B3FD9" android:strokeWidth="6.4" android:strokeLineCap="round" />
+    </group>
+</vector>

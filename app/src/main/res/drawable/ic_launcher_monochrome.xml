@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A little creature peeking over the top of a photo. -->
+<!-- Themed-icon version: silhouette only. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <group android:pivotX="54" android:pivotY="56" android:scaleX="0.9" android:scaleY="0.9">
-        <path android:fillColor="#FFFFFF" android:pathData="M33,54 C33,36 41,25 54,25 C67,25 75,36 75,54 Z M40.3,42 a6.2,7.2 0 1,0 12.4,0 a6.2,7.2 0 1,0 -12.4,0 Z M55.3,42 a6.2,7.2 0 1,0 12.4,0 a6.2,7.2 0 1,0 -12.4,0 Z" android:fillType="evenOdd" />
-        <path android:fillColor="#FFFFFF" android:pathData="M44.6,45 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0 Z M59.6,45 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0 Z" />
-        <group android:pivotX="54" android:pivotY="66" android:rotation="-7">
-            <path android:fillColor="#FFFFFF" android:pathData="M35,52 h38 a5,5 0 0 1 5,5 v20 a5,5 0 0 1 -5,5 h-38 a5,5 0 0 1 -5,-5 v-20 a5,5 0 0 1 5,-5 Z M36.0,55.5 h36.0 a2.5,2.5 0 0 1 2.5,2.5 v18.0 a2.5,2.5 0 0 1 -2.5,2.5 h-36.0 a2.5,2.5 0 0 1 -2.5,-2.5 v-18.0 a2.5,2.5 0 0 1 2.5,-2.5 Z" android:fillType="evenOdd" />
-            <path android:fillColor="#FFFFFF" android:pathData="M62.4,61.5 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0 Z M33.5,74 L43,64.5 L50,71 L56,66 L74.5,78.5 L33.5,78.5 Z" />
-            <path android:fillColor="#FFFFFF" android:pathData="M32.9,52.6 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z M37.9,52.2 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z M64.9,52.2 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z M69.9,52.6 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" />
+    <group android:pivotX="54" android:pivotY="58" android:scaleX="0.92" android:scaleY="0.92">
+        <path android:fillColor="#FFFFFF" android:pathData="M20,44 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0 Z M60,44 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M36,56 C36,40 43,29 54,29 C65,29 72,40 72,56 Z M43.5,44 a4.3,5.2 0 1,0 8.6,0 a4.3,5.2 0 1,0 -8.6,0 Z M55.9,44 a4.3,5.2 0 1,0 8.6,0 a4.3,5.2 0 1,0 -8.6,0 Z" android:fillType="evenOdd" />
+        <path android:fillColor="#FFFFFF" android:pathData="M46.5,45.6 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z M58.9,45.6 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" />
+        <group android:pivotX="54" android:pivotY="68" android:rotation="-7">
+            <path android:fillColor="#FFFFFF" android:pathData="M34.5,56 h39 a4.5,4.5 0 0 1 4.5,4.5 v19 a4.5,4.5 0 0 1 -4.5,4.5 h-39 a4.5,4.5 0 0 1 -4.5,-4.5 v-19 a4.5,4.5 0 0 1 4.5,-4.5 Z M35.7,59.5 h36.6 a2.2,2.2 0 0 1 2.2,2.2 v16.6 a2.2,2.2 0 0 1 -2.2,2.2 h-36.6 a2.2,2.2 0 0 1 -2.2,-2.2 v-16.6 a2.2,2.2 0 0 1 2.2,-2.2 Z" android:fillType="evenOdd" />
+            <path android:fillColor="#FFFFFF" android:pathData="M63.7,65 a3.3,3.3 0 1,0 6.6,0 a3.3,3.3 0 1,0 -6.6,0 Z M33.5,77 L43,68 L50,74 L56,69.5 L74.5,80.5 L33.5,80.5 Z" />
         </group>
+        <path android:pathData="M54,52 C54.5,57 54,60 52.5,62.5 C51,65 47.5,66 46,64.2" android:strokeColor="#FFFFFF" android:strokeWidth="6.4" android:strokeLineCap="round" />
     </group>
 </vector>
