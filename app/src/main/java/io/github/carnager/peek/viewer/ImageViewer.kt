@@ -141,6 +141,8 @@ fun ImageViewer(
     onSwipeClose: ((offsetY: Float, scale: Float, backdrop: Float) -> Unit)? = null,
     onFavorite: ((ViewerItem) -> Unit)? = null,
     onAddToAlbum: ((ViewerItem) -> Unit)? = null,
+    /** Replaces the built-in share, e.g. to fetch a server original first. */
+    onShare: ((ViewerItem) -> Unit)? = null,
 ) {
     if (items.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
@@ -303,11 +305,11 @@ fun ImageViewer(
                         .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    if (!current.remote) PillIcon(Icons.Rounded.Share, "Teilen") { share(ctx, listOf(current.uri), current.mimeType) }
+                    PillIcon(Icons.Rounded.Share, "Teilen") { onShare?.invoke(current) ?: share(ctx, listOf(current.uri), current.mimeType) }
                     if (onFavorite != null) {
                         FavoriteIcon(current.favorite) { onFavorite(current) }
                     }
-                    if (!current.isVideo && !current.remote) PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
+                    if (!current.isVideo) PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
                     if (onDelete != null) PillIcon(Icons.Rounded.DeleteOutline, "Löschen") { onDelete(current) }
                     PillIcon(Icons.Rounded.Info, "Info") { info = current }
                 }
@@ -391,6 +393,8 @@ fun share(ctx: Context, uris: List<Uri>, mime: String = "image/*") {
     } else {
         Intent(Intent.ACTION_SEND_MULTIPLE).setType(mime).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
     }
+    // Read permission for every file, also our own FileProvider ones, travels with the ClipData.
+    intent.clipData = android.content.ClipData.newRawUri(null, uris[0]).apply { uris.drop(1).forEach { addItem(android.content.ClipData.Item(it)) } }
     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     ctx.startActivity(Intent.createChooser(intent, null))
 }

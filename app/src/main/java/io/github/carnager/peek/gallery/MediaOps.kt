@@ -10,6 +10,9 @@ interface MediaOps {
     fun setFavorite(images: List<MediaImage>, favorite: Boolean)
     fun edit(uri: Uri)
 
+    /** Opens a downloaded trunk original in the editor; the result goes back to trunk as a copy. */
+    fun editTrunk(uri: Uri, asset: io.github.carnager.peek.trunk.RemoteAsset)
+
     /** Queues photos and videos for upload to trunk, asking for what the upload needs first. */
     fun uploadToTrunk(images: List<MediaImage>)
 

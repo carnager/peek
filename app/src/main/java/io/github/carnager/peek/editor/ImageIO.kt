@@ -120,6 +120,10 @@ object ImageIO {
         }
     }
 
+    /** The edited image as a file, carrying over the source's EXIF data (for JPEG). */
+    internal fun encodeWithExif(context: Context, bitmap: Bitmap, source: SourceInfo, format: SaveFormat, quality: Int): File =
+        encode(context, bitmap, format, quality, readExif(context, source.uri))
+
     private fun encode(context: Context, bitmap: Bitmap, format: SaveFormat, quality: Int, exif: Map<String, String>): File {
         val tmp = File.createTempFile("peek_", ".${format.ext}", context.cacheDir)
         tmp.outputStream().buffered().use { bitmap.compress(format.compress, if (format.lossy) quality else 100, it) }

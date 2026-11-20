@@ -102,6 +102,7 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
 
 @Composable
 fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
+    val ctx = LocalContext.current
     val albumsGrid = rememberLazyGridState()
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(vm.message?.token) {
@@ -163,7 +164,16 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                                 closeHero(vm, list, screenW, screenH, dy, sc, bg)
                                 vm.viewerIndex = null
                             },
-                            onEdit = { ops.edit(it.uri) },
+                            onEdit = { item ->
+                                val img = list.firstOrNull { it.uri == item.uri }
+                                val remote = img?.remote
+                                if (img != null && remote != null) vm.withTrunkOriginals(listOf(img)) { ops.editTrunk(it[0], remote) } else ops.edit(item.uri)
+                            },
+                            onShare = if (vm.open != Source.Trunk) null else { item ->
+                                list.firstOrNull { it.uri == item.uri }?.let { img ->
+                                    vm.withTrunkOriginals(listOf(img)) { io.github.carnager.peek.viewer.share(ctx, it, img.mimeType) }
+                                }
+                            },
                             onDelete = { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { if (it.remote != null) vm.trunkTrash(listOf(it)) else ops.trash(listOf(it)) }
                             },

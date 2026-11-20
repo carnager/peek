@@ -113,6 +113,9 @@ class MainActivity : ComponentActivity() {
 
         override fun edit(uri: Uri) = editor.launch(EditorActivity.intent(this@MainActivity, uri))
 
+        override fun editTrunk(uri: Uri, asset: io.github.carnager.peek.trunk.RemoteAsset) =
+            editor.launch(EditorActivity.trunkIntent(this@MainActivity, uri, asset))
+
         override fun uploadToTrunk(images: List<MediaImage>) {
             if (images.isEmpty()) return
             pendingUpload = images
@@ -138,6 +141,7 @@ class MainActivity : ComponentActivity() {
             SingletonImageLoader.get(this).memoryCache?.clear()
             val saved = res.data?.data
             vm.reload { saved?.let(vm::showInViewer) }
+            vm.syncTrunk()
         }
     }
 

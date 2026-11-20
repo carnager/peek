@@ -161,6 +161,26 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         return ImageIO.saveCopy(getApplication(), bmp, source!!, format, quality)
     }
 
+    /** Uploads the edit to trunk as a new photo next to the original. */
+    suspend fun uploadToTrunk(format: SaveFormat, quality: Int, originalName: String, taken: Long) = withContext(Dispatchers.IO) {
+        val bmp = current ?: error("Kein Bild")
+        val file = ImageIO.encodeWithExif(getApplication(), bmp, source!!, format, quality)
+        try {
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buf = ByteArray(1 shl 16)
+                while (true) { val n = input.read(buf); if (n < 0) break; md.update(buf, 0, n) }
+            }
+            val sha = md.digest().joinToString("") { "%02x".format(it) }
+            val name = originalName.substringBeforeLast('.') + "_edit." + format.ext
+            io.github.carnager.peek.trunk.TrunkClient.upload(name, taken, sha, format.mime, file.length()) { sink ->
+                file.inputStream().use { it.copyTo(sink.outputStream()) }
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
     suspend fun overwrite(quality: Int) {
         val bmp = current ?: error("Kein Bild")
         ImageIO.overwrite(getApplication(), bmp, source!!, quality)

@@ -46,6 +46,16 @@ class EditorActivity : ComponentActivity() {
                             done(out, "Als Kopie gespeichert")
                         }
                     },
+                    onUploadToTrunk = intent.getLongExtra(EXTRA_TRUNK_ID, 0L).takeIf { it != 0L }?.let {
+                        { format, quality ->
+                            vm.runBusy {
+                                vm.uploadToTrunk(format, quality, intent.getStringExtra(EXTRA_TRUNK_NAME) ?: "bild.jpg", intent.getLongExtra(EXTRA_TRUNK_TAKEN, 0L))
+                                Toast.makeText(this, "Als Kopie zu trunk hochgeladen", Toast.LENGTH_SHORT).show()
+                                setResult(RESULT_OK)
+                                finish()
+                            }
+                        }
+                    },
                     onOverwrite = { quality ->
                         val src = vm.source ?: return@EditorScreen
                         pendingQuality = quality
@@ -86,9 +96,20 @@ class EditorActivity : ComponentActivity() {
     }
 
     companion object {
+        const val EXTRA_TRUNK_ID = "trunkId"
+        const val EXTRA_TRUNK_NAME = "trunkName"
+        const val EXTRA_TRUNK_TAKEN = "trunkTaken"
+
         fun intent(activity: Activity, uri: Uri): Intent =
             Intent(activity, EditorActivity::class.java)
                 .setData(uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+        /** For a photo from trunk, opened from its downloaded original. */
+        fun trunkIntent(activity: Activity, uri: Uri, asset: io.github.carnager.peek.trunk.RemoteAsset): Intent =
+            intent(activity, uri)
+                .putExtra(EXTRA_TRUNK_ID, asset.id)
+                .putExtra(EXTRA_TRUNK_NAME, asset.name)
+                .putExtra(EXTRA_TRUNK_TAKEN, asset.takenAt)
     }
 }

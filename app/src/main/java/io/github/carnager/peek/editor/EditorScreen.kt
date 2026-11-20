@@ -88,6 +88,8 @@ fun EditorScreen(
     onClose: () -> Unit,
     onSaveCopy: (SaveFormat, Int) -> Unit,
     onOverwrite: (Int) -> Unit,
+    /** Set when the photo came from trunk: the edit goes back there as a copy. */
+    onUploadToTrunk: ((SaveFormat, Int) -> Unit)? = null,
 ) {
     var confirmDiscard by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
@@ -235,6 +237,7 @@ fun EditorScreen(
                 onDismiss = { showSave = false },
                 onSaveCopy = { f, q -> showSave = false; onSaveCopy(f, q) },
                 onOverwrite = { q -> showSave = false; onOverwrite(q) },
+                onUploadToTrunk = onUploadToTrunk?.let { up -> { f, q -> showSave = false; up(f, q) } },
             )
         }
     }
@@ -346,6 +349,7 @@ private fun SaveDialog(
     onDismiss: () -> Unit,
     onSaveCopy: (SaveFormat, Int) -> Unit,
     onOverwrite: (Int) -> Unit,
+    onUploadToTrunk: ((SaveFormat, Int) -> Unit)?,
 ) {
     val originalFormat = SaveFormat.forMime(source.mimeType)
     var format by remember { mutableStateOf(originalFormat ?: SaveFormat.JPEG) }
@@ -387,23 +391,42 @@ private fun SaveDialog(
                 }
             }
             Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = { onSaveCopy(format, quality.roundToInt()) },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-            ) { Text("Als Kopie speichern", style = MaterialTheme.typography.titleSmall) }
-            Spacer(Modifier.height(10.dp))
-            if (originalFormat != null && format == originalFormat) {
-                OutlinedButton(
-                    onClick = { onOverwrite(quality.roundToInt()) },
+            if (onUploadToTrunk != null) {
+                Button(
+                    onClick = { onUploadToTrunk(format, quality.roundToInt()) },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                ) { Text("Original ersetzen", style = MaterialTheme.typography.titleSmall) }
-            } else {
+                ) { Text("Als Kopie zu trunk hochladen", style = MaterialTheme.typography.titleSmall) }
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = { onSaveCopy(format, quality.roundToInt()) },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                ) { Text("Auf dem Handy speichern", style = MaterialTheme.typography.titleSmall) }
                 Text(
-                    "Original ersetzen geht nur im Originalformat${originalFormat?.let { " (${it.name})" } ?: ""}.",
+                    "Das Original auf trunk bleibt unverändert.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp).align(Alignment.CenterHorizontally),
+                    modifier = Modifier.padding(top = 8.dp).align(Alignment.CenterHorizontally),
                 )
+            } else {
+                Button(
+                    onClick = { onSaveCopy(format, quality.roundToInt()) },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                ) { Text("Als Kopie speichern", style = MaterialTheme.typography.titleSmall) }
+                Spacer(Modifier.height(10.dp))
+                if (originalFormat != null && format == originalFormat) {
+                    OutlinedButton(
+                        onClick = { onOverwrite(quality.roundToInt()) },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                    ) { Text("Original ersetzen", style = MaterialTheme.typography.titleSmall) }
+                } else {
+                    Text(
+                        "Original ersetzen geht nur im Originalformat${originalFormat?.let { " (${it.name})" } ?: ""}.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp).align(Alignment.CenterHorizontally),
+                    )
+                }
+
             }
         }
     }

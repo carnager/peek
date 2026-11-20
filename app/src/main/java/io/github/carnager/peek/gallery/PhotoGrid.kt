@@ -416,6 +416,14 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (isTrunk) {
+                            PillAction(Icons.Rounded.Share, "Teilen") {
+                                val mime = when {
+                                    selected.all { it.isVideo } -> "video/*"
+                                    selected.none { it.isVideo } -> "image/*"
+                                    else -> "*/*"
+                                }
+                                vm.withTrunkOriginals(selected) { share(ctx, it, mime) }
+                            }
                             val allFav = selected.isNotEmpty() && selected.all { it.isFavorite }
                             PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) "Kein Fav." else "Favorit") {
                                 vm.trunkFavorite(selected, !allFav)

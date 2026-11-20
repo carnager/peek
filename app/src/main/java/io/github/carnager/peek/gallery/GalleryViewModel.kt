@@ -170,6 +170,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             TrunkClient.logout(getApplication())
             TrunkLibrary.clear(getApplication())
+            io.github.carnager.peek.trunk.TrunkFiles.clear(getApplication())
             trunkConnected = false
             trunk = emptyList()
             if (open == Source.Trunk) open = null
@@ -186,6 +187,17 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 message = Message("trunk: ${e.message ?: e.javaClass.simpleName}")
             }
         }
+    }
+
+    /** Downloads the originals of trunk photos (cached), then hands their local URIs to [then]. */
+    fun withTrunkOriginals(images: List<MediaImage>, then: (List<Uri>) -> Unit) = trunkCall {
+        val remote = images.mapNotNull { it.remote }
+        if (remote.isEmpty()) return@trunkCall
+        if (remote.sumOf { it.size } > 2_000_000) {
+            message = Message(if (remote.size == 1) "Lade Original …" else "Lade ${remote.size} Originale …")
+        }
+        val uris = remote.map { io.github.carnager.peek.trunk.TrunkFiles.original(getApplication(), it) }
+        then(uris)
     }
 
     fun trunkFavorite(images: List<MediaImage>, favorite: Boolean) = trunkCall {
