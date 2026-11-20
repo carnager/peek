@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.rounded.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.rounded.FormatAlignRight
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Brush
+import androidx.compose.material.icons.rounded.ArrowOutward
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FormatAlignCenter
@@ -121,7 +122,8 @@ fun DrawTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
     val bmp = vm.preview ?: return
     var color by remember { mutableIntStateOf(0xFFE53935.toInt()) }
     var width by remember { mutableFloatStateOf(0.012f) }
-    var marker by remember { mutableStateOf(false) }
+    // 0 = pen, 1 = marker, 2 = arrow
+    var mode by remember { mutableIntStateOf(0) }
     val live = remember { mutableStateListOf<Pair<Float, Float>>() }
     var imgRect by remember { mutableStateOf(RectF()) }
     val rect by rememberUpdatedState(imgRect)
@@ -146,25 +148,30 @@ fun DrawTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
                         val ch = ev.changes.first()
                         if (!ch.pressed) break
                         if (ch.positionChanged()) {
+                            if (mode == 2) {
+                                // An arrow only needs its start and the current tip.
+                                if (live.size > 1) live.removeAt(live.lastIndex)
+                            }
                             live += norm(ch.position)
                             ch.consume()
                         }
                     }
-                    if (!multi) vm.strokes += Stroke(live.toList(), color, width, marker)
+                    if (!multi && (mode != 2 || live.size > 1)) vm.strokes += Stroke(live.toList(), color, width, mode == 1, mode == 2)
                     live.clear()
                 }
             },
         ) { r ->
             drawIntoCanvas { c ->
                 vm.strokes.forEach { OverlayRenderer.drawStroke(c.nativeCanvas, it, r.left, r.top, r.width(), r.height()) }
-                if (live.isNotEmpty()) OverlayRenderer.drawStroke(c.nativeCanvas, Stroke(live.toList(), color, width, marker), r.left, r.top, r.width(), r.height())
+                if (live.isNotEmpty()) OverlayRenderer.drawStroke(c.nativeCanvas, Stroke(live.toList(), color, width, mode == 1, mode == 2), r.left, r.top, r.width(), r.height())
             }
         }
         ToolSheet {
         ColorRow(color) { color = it }
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilledTonalIconToggleButton(checked = !marker, onCheckedChange = { marker = false }) { Icon(Icons.Rounded.Brush, "Stift") }
-            FilledTonalIconToggleButton(checked = marker, onCheckedChange = { marker = true }) { Icon(Icons.Rounded.Highlight, "Marker") }
+            FilledTonalIconToggleButton(checked = mode == 0, onCheckedChange = { mode = 0 }) { Icon(Icons.Rounded.Brush, "Stift") }
+            FilledTonalIconToggleButton(checked = mode == 1, onCheckedChange = { mode = 1 }) { Icon(Icons.Rounded.Highlight, "Marker") }
+            FilledTonalIconToggleButton(checked = mode == 2, onCheckedChange = { mode = 2 }) { Icon(Icons.Rounded.ArrowOutward, "Pfeil") }
             // Brush size preview dot.
             Box(Modifier.width(36.dp), contentAlignment = Alignment.Center) {
                 val d = with(LocalDensity.current) { (width * min(imgRect.width(), imgRect.height())).toDp() }.coerceIn(2.dp, 32.dp)

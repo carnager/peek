@@ -11,8 +11,14 @@ data class Adjustments(
     val tint: Float = 0f,
     val fade: Float = 0f,
     val vignette: Float = 0f,
+    val highlights: Float = 0f,
+    val shadows: Float = 0f,
+    val sharpen: Float = 0f,
 ) {
     val isIdentity get() = this == Adjustments()
+
+    /** The parts that need per-pixel work on the CPU (everything else is a GPU colour matrix). */
+    val pixelPart get() = Triple(highlights, shadows, sharpen)
 
     fun matrix(): ColorMatrix {
         val m = ColorMatrix()
@@ -47,10 +53,13 @@ data class Adjustments(
 enum class AdjustParam(val label: String, val min: Float) {
     BRIGHTNESS("Helligkeit", -1f),
     CONTRAST("Kontrast", -1f),
+    HIGHLIGHTS("Lichter", -1f),
+    SHADOWS("Schatten", -1f),
     SATURATION("Sättigung", -1f),
     WARMTH("Wärme", -1f),
     TINT("Tönung", -1f),
     FADE("Verblassen", 0f),
+    SHARPEN("Schärfe", 0f),
     VIGNETTE("Vignette", 0f);
 
     fun get(a: Adjustments) = when (this) {
@@ -61,6 +70,9 @@ enum class AdjustParam(val label: String, val min: Float) {
         TINT -> a.tint
         FADE -> a.fade
         VIGNETTE -> a.vignette
+        HIGHLIGHTS -> a.highlights
+        SHADOWS -> a.shadows
+        SHARPEN -> a.sharpen
     }
 
     fun set(a: Adjustments, v: Float) = when (this) {
@@ -71,6 +83,9 @@ enum class AdjustParam(val label: String, val min: Float) {
         TINT -> a.copy(tint = v)
         FADE -> a.copy(fade = v)
         VIGNETTE -> a.copy(vignette = v)
+        HIGHLIGHTS -> a.copy(highlights = v)
+        SHADOWS -> a.copy(shadows = v)
+        SHARPEN -> a.copy(sharpen = v)
     }
 }
 

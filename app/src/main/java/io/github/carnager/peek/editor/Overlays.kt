@@ -49,6 +49,8 @@ data class Stroke(
     /** Line width as a fraction of the shorter image side. */
     val width: Float,
     val marker: Boolean,
+    /** A straight arrow from the first to the last point. */
+    val arrow: Boolean = false,
 )
 
 object OverlayRenderer {
@@ -172,6 +174,10 @@ object OverlayRenderer {
             if (stroke.marker) alpha = 110
         }
         val pts = stroke.points
+        if (stroke.arrow) {
+            drawArrow(canvas, paint, ox + pts.first().first * w, oy + pts.first().second * h, ox + pts.last().first * w, oy + pts.last().second * h)
+            return
+        }
         if (pts.size == 1) {
             paint.style = Paint.Style.FILL
             canvas.drawCircle(ox + pts[0].first * w, oy + pts[0].second * h, paint.strokeWidth / 2, paint)
@@ -188,5 +194,34 @@ object OverlayRenderer {
         val last = pts.last()
         path.lineTo(ox + last.first * w, oy + last.second * h)
         canvas.drawPath(path, paint)
+    }
+
+    private fun drawArrow(canvas: Canvas, paint: Paint, x0: Float, y0: Float, x1: Float, y1: Float) {
+        val dx = x1 - x0
+        val dy = y1 - y0
+        val len = kotlin.math.hypot(dx, dy)
+        if (len < 1f) return
+        val ux = dx / len
+        val uy = dy / len
+        val sw = paint.strokeWidth
+        // Head scales with the line, but never longer than half the arrow.
+        val head = minOf(sw * 4.2f, len * 0.5f)
+        val half = head * 0.62f
+        val bx = x1 - ux * head
+        val by = y1 - uy * head
+        paint.strokeCap = Paint.Cap.ROUND
+        canvas.drawLine(x0, y0, bx + ux * sw * 0.5f, by + uy * sw * 0.5f, paint)
+        val tip = Path().apply {
+            moveTo(x1, y1)
+            lineTo(bx - uy * half, by + ux * half)
+            lineTo(bx + uy * half, by - ux * half)
+            close()
+        }
+        val fill = Paint(paint).apply {
+            style = Paint.Style.FILL_AND_STROKE
+            strokeJoin = Paint.Join.ROUND
+            strokeWidth = sw * 0.35f
+        }
+        canvas.drawPath(tip, fill)
     }
 }

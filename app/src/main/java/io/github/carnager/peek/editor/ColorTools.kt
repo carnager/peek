@@ -24,6 +24,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,10 +55,17 @@ fun AdjustTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
     var adj by remember { mutableStateOf(Adjustments()) }
     var param by remember { mutableStateOf(AdjustParam.BRIGHTNESS) }
     var compare by remember { mutableStateOf(false) }
+    // Tone and sharpening run on the CPU; recompute them a moment after the slider settles.
+    var processed by remember(bmp) { mutableStateOf(bmp) }
+    LaunchedEffect(bmp, adj.pixelPart) {
+        kotlinx.coroutines.delay(40)
+        val a = adj
+        processed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { ImageOps.pixelAdjust(bmp, a) }
+    }
 
     Column(modifier) {
         ImageStage(
-            bitmap = bmp,
+            bitmap = if (compare) bmp else processed,
             modifier = Modifier.weight(1f),
             colorMatrix = if (compare) null else adj.matrix(),
             vignette = if (compare) 0f else adj.vignette,
@@ -84,7 +92,7 @@ fun AdjustTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             onCancel = vm::closeTool,
             onApply = {
                 val a = adj
-                if (a.isIdentity) vm.closeTool() else vm.commit { ImageOps.applyColor(it, a.matrix(), a.vignette) }
+                if (a.isIdentity) vm.closeTool() else vm.commit { ImageOps.applyColor(ImageOps.pixelAdjust(it, a), a.matrix(), a.vignette) }
             },
         )
         }

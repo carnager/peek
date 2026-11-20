@@ -33,6 +33,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.height
+import kotlin.math.roundToInt
 import io.github.carnager.peek.ui.PillChip
 import io.github.carnager.peek.ui.ToolSheet
 import androidx.compose.ui.Modifier
@@ -65,6 +69,8 @@ fun ImageStage(
     padding: Dp = 16.dp,
     colorMatrix: android.graphics.ColorMatrix? = null,
     vignette: Float = 0f,
+    /** Straightening angle in degrees; the image is zoomed so the frame stays filled. */
+    angle: Float = 0f,
     gestures: Modifier = Modifier,
     onRect: (RectF) -> Unit = {},
     overlay: androidx.compose.ui.graphics.drawscope.DrawScope.(RectF) -> Unit = {},
@@ -81,7 +87,18 @@ fun ImageStage(
         Canvas(Modifier.fillMaxSize().then(gestures)) {
             drawIntoCanvas { c ->
                 paint.colorFilter = colorMatrix?.let { ColorMatrixColorFilter(it) }
-                c.nativeCanvas.drawBitmap(bitmap, null, rect, paint)
+                val nc = c.nativeCanvas
+                if (angle != 0f) {
+                    val sc = ImageOps.straightenScale(rect.width(), rect.height(), angle)
+                    nc.save()
+                    nc.clipRect(rect)
+                    nc.rotate(angle, rect.centerX(), rect.centerY())
+                    nc.scale(sc, sc, rect.centerX(), rect.centerY())
+                    nc.drawBitmap(bitmap, null, rect, paint)
+                    nc.restore()
+                } else {
+                    nc.drawBitmap(bitmap, null, rect, paint)
+                }
                 ImageOps.drawVignette(c.nativeCanvas, rect.left, rect.top, rect.width(), rect.height(), vignette)
             }
             overlay(rect)
@@ -184,6 +201,8 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
     var aspectIndex by remember { mutableIntStateOf(0) }
     var crop by remember { mutableStateOf(RectF(0f, 0f, 1f, 1f)) }
     var dragging by remember { mutableStateOf(false) }
+    var angle by remember { mutableFloatStateOf(0f) }
+    var straightening by remember { mutableStateOf(false) }
 
     val originalRatio = base.width.toFloat() / base.height
     fun ratioPx(): Float? {
@@ -208,6 +227,7 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
         ImageStage(
             bitmap = shown,
             padding = 28.dp,
+            angle = angle,
             modifier = Modifier.weight(1f),
             onRect = { imgRect = it },
             gestures = Modifier.pointerInput(shown, aspectIndex) {
@@ -262,7 +282,12 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             clipRect(l, t, l + w, t + h, clipOp = ClipOp.Difference) {
                 drawRect(Color.Black.copy(alpha = 0.6f), Offset(ir.left, ir.top), Size(ir.width(), ir.height()))
             }
-            if (dragging) {
+            if (straightening) {
+                for (i in 1..5) {
+                    drawLine(Color.White.copy(alpha = 0.35f), Offset(l + w * i / 6, t), Offset(l + w * i / 6, t + h), stroke)
+                    drawLine(Color.White.copy(alpha = 0.35f), Offset(l, t + h * i / 6), Offset(l + w, t + h * i / 6), stroke)
+                }
+            } else if (dragging) {
                 for (i in 1..2) {
                     drawLine(Color.White.copy(alpha = 0.6f), Offset(l + w * i / 3, t), Offset(l + w * i / 3, t + h), stroke)
                     drawLine(Color.White.copy(alpha = 0.6f), Offset(l, t + h * i / 3), Offset(l + w, t + h * i / 3), stroke)
@@ -287,6 +312,12 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
                 PillChip(selected = i == aspectIndex, label = a.label) { aspectIndex = i; resetCrop() }
             }
         }
+        AngleDial(
+            value = angle,
+            onChange = { angle = it },
+            onActive = { straightening = it },
+            modifier = Modifier.padding(top = 6.dp),
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             IconButton(onClick = { turns = (turns + 3) % 4; crop = RectF(0f, 0f, 1f, 1f); aspectIndex = 0 }) {
                 Icon(Icons.AutoMirrored.Rounded.RotateLeft, "Links drehen")
@@ -300,7 +331,7 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             IconButton(onClick = { flipV = !flipV; crop = RectF(crop.left, 1 - crop.bottom, crop.right, 1 - crop.top) }) {
                 Icon(Icons.Rounded.Flip, "Vertikal spiegeln", Modifier.rotate(90f))
             }
-            IconButton(onClick = { turns = 0; flipH = false; flipV = false; aspectIndex = 0; crop = RectF(0f, 0f, 1f, 1f) }) {
+            IconButton(onClick = { turns = 0; flipH = false; flipV = false; angle = 0f; aspectIndex = 0; crop = RectF(0f, 0f, 1f, 1f) }) {
                 Icon(Icons.Rounded.RestartAlt, "Zurücksetzen")
             }
         }
@@ -309,10 +340,77 @@ fun CropTool(vm: EditorViewModel, modifier: Modifier = Modifier) {
             onCancel = vm::closeTool,
             onApply = {
                 val c = RectF(crop)
-                val t = turns; val fh = flipH; val fv = flipV
-                vm.commit { ImageOps.crop(ImageOps.transform(it, t, fh, fv), c) }
+                val t = turns; val fh = flipH; val fv = flipV; val a = angle
+                vm.commit { ImageOps.crop(ImageOps.straighten(ImageOps.transform(it, t, fh, fv), a), c) }
             },
         )
+        }
+    }
+}
+
+/**
+ * A horizontal ruler you drag to straighten the image, ±45°. Ticks click under the finger and it
+ * snaps back to exactly 0° when you pass near it.
+ */
+@Composable
+fun AngleDial(value: Float, onChange: (Float) -> Unit, onActive: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val pxPerDegree = with(density) { 9.dp.toPx() }
+    val current by rememberUpdatedState(value)
+    val primary = androidx.compose.material3.MaterialTheme.colorScheme.primary
+    val onSurface = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            if (value == 0f) "0°" else "%+.1f°".format(value),
+            style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+            color = if (value == 0f) onSurface.copy(alpha = 0.7f) else primary,
+            modifier = Modifier.clickable { onChange(0f) },
+        )
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .pointerInput(Unit) {
+                    var raw = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { raw = current; onActive(true) },
+                        onDragEnd = { onActive(false) },
+                        onDragCancel = { onActive(false) },
+                    ) { change, dx ->
+                        change.consume()
+                        val before = current
+                        raw = (raw - dx / pxPerDegree).coerceIn(-45f, 45f)
+                        // Sticky zero: within half a degree it locks to straight.
+                        val next = if (abs(raw) < 0.5f) 0f else (raw * 10).roundToInt() / 10f
+                        if (next != before) {
+                            if (next == 0f) {
+                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                            } else if (next.toInt() != before.toInt() || (next < 0) != (before < 0)) {
+                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentFrequentTick)
+                            }
+                            onChange(next)
+                        }
+                    }
+                },
+        ) {
+            val cx = size.width / 2
+            val first = kotlin.math.floor(current - cx / pxPerDegree).toInt().coerceAtLeast(-45)
+            val last = kotlin.math.ceil(current + cx / pxPerDegree).toInt().coerceAtMost(45)
+            for (d in first..last) {
+                val x = cx + (d - current) * pxPerDegree
+                val major = d % 5 == 0
+                val fade = (1f - abs(x - cx) / cx).coerceIn(0f, 1f)
+                val len = if (d == 0) size.height * 0.75f else if (major) size.height * 0.5f else size.height * 0.28f
+                drawLine(
+                    onSurface.copy(alpha = 0.15f + 0.6f * fade),
+                    Offset(x, (size.height - len) / 2),
+                    Offset(x, (size.height + len) / 2),
+                    strokeWidth = if (major) 2.dp.toPx() else 1.dp.toPx(),
+                )
+            }
+            // Centre marker.
+            drawLine(primary, Offset(cx, 0f), Offset(cx, size.height), strokeWidth = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
         }
     }
 }
