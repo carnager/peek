@@ -121,12 +121,16 @@ class MainActivity : ComponentActivity() {
 
     private val readPermissions: Array<String> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
 
-    private fun hasFullAccess() = readPermissions.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
+    // Photos are what peek needs; videos are optional, so declining them still opens the gallery.
+    private fun hasFullAccess() = ContextCompat.checkSelfPermission(this, readPermissions[0]) == PackageManager.PERMISSION_GRANTED
+
+    private fun hasVideoAccess() = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
 
     private fun hasPartialAccess() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
@@ -145,7 +149,16 @@ class MainActivity : ComponentActivity() {
                         if (full || partial) vm.reload()
                     }
                     LaunchedEffect(Unit) {
-                        if (!full && !partial) request.launch(requestSet())
+                        if (!full && !partial) {
+                            request.launch(requestSet())
+                        } else if (full && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasVideoAccess()) {
+                            // Installs from before video support only granted photos: ask once for videos too.
+                            val prefs = getSharedPreferences("gallery", 0)
+                            if (!prefs.getBoolean("askedVideo", false)) {
+                                prefs.edit().putBoolean("askedVideo", true).apply()
+                                request.launch(arrayOf(Manifest.permission.READ_MEDIA_VIDEO))
+                            }
+                        }
                     }
                     LifecycleResumeEffect(full, partial) {
                         full = hasFullAccess()

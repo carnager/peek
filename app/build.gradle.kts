@@ -79,6 +79,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-gif:3.6.3")
+    // Video thumbnails in the grid.
+    implementation("io.coil-kt.coil3:coil-video:3.6.3")
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    // PlayerSurface: video in Compose without a View that would swallow the pager's swipes.
+    implementation("androidx.media3:media3-ui-compose:1.11.1")
     // Pinch zoom with tiled loading, so 50-megapixel photos stay sharp without eating memory.
     implementation("me.saket.telephoto:zoomable-image-coil3:0.19.0")
 }

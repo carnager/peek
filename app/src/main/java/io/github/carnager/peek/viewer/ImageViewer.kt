@@ -84,6 +84,7 @@ import androidx.compose.material.icons.rounded.AspectRatio
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.PhotoAlbum
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Camera
@@ -116,6 +117,9 @@ data class ViewerItem(
     /** Memory-cache key of an already loaded thumbnail, shown until the full image is ready. */
     val placeholderKey: String? = null,
     val favorite: Boolean = false,
+    val isVideo: Boolean = false,
+    /** Video length in ms. */
+    val duration: Long = 0,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -184,6 +188,11 @@ fun ImageViewer(
             },
         ) { page ->
             val item = items[page]
+            if (item.isVideo) {
+                if (page == pager.currentPage) LaunchedEffect(Unit) { zoomed = false }
+                VideoPage(item, isCurrent = page == pager.currentPage, chrome = chrome, onTap = { chrome = !chrome })
+                return@HorizontalPager
+            }
             val state = rememberZoomableImageState(rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 10f)))
             if (page == pager.currentPage) {
                 val z = (state.zoomableState.zoomFraction ?: 0f) > 0.01f
@@ -275,7 +284,7 @@ fun ImageViewer(
                     if (onFavorite != null) {
                         FavoriteIcon(current.favorite) { onFavorite(current) }
                     }
-                    PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
+                    if (!current.isVideo) PillIcon(Icons.Rounded.AutoFixHigh, "Bearbeiten", highlight = true) { onEdit(current) }
                     if (onDelete != null) PillIcon(Icons.Rounded.DeleteOutline, "Löschen") { onDelete(current) }
                     PillIcon(Icons.Rounded.Info, "Info") { info = current }
                 }
@@ -356,12 +365,13 @@ private fun PillIcon(icon: ImageVector, label: String, highlight: Boolean = fals
 private fun InfoSheet(item: ViewerItem) {
     val ctx = LocalContext.current
     val exif by produceState<List<Pair<String, String>>>(emptyList(), item.uri) {
-        value = withContext(Dispatchers.IO) { readExifSummary(ctx, item.uri) }
+        value = if (item.isVideo) emptyList() else withContext(Dispatchers.IO) { readExifSummary(ctx, item.uri) }
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
         Text(item.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 4.dp, bottom = 16.dp))
         val rows = buildList {
             if (item.date > 0) add(Triple(Icons.Rounded.CalendarMonth, "Datum", DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.SHORT).format(Date(item.date))))
+            if (item.isVideo && item.duration > 0) add(Triple(Icons.Rounded.PlayCircle, "Länge", formatDuration(item.duration)))
             if (item.width > 0) add(Triple(Icons.Rounded.AspectRatio, "Auflösung", "${item.width} × ${item.height} · ${"%.1f".format(item.width * item.height / 1e6)} MP"))
             if (item.size > 0) add(Triple(Icons.Rounded.Storage, "Größe", "${Formatter.formatFileSize(ctx, item.size)} · ${item.mimeType.substringAfter('/').uppercase()}"))
             item.path?.let { add(Triple(Icons.Rounded.Folder, "Ordner", it)) }
@@ -407,7 +417,7 @@ fun share(ctx: Context, uris: List<Uri>, mime: String = "image/*") {
     val intent = if (uris.size == 1) {
         Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uris[0])
     } else {
-        Intent(Intent.ACTION_SEND_MULTIPLE).setType("image/*").putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+        Intent(Intent.ACTION_SEND_MULTIPLE).setType(mime).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
     }
     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     ctx.startActivity(Intent.createChooser(intent, null))

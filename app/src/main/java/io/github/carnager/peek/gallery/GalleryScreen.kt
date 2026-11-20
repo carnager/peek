@@ -73,6 +73,8 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
     version = modified,
     placeholderKey = placeholderKey,
     favorite = isFavorite,
+    isVideo = isVideo,
+    duration = duration,
 )
 
 @Composable

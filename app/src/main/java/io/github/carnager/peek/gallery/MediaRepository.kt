@@ -24,6 +24,9 @@ data class MediaImage(
     val isFavorite: Boolean = false,
     /** For trashed items: when the system deletes it for good (ms), else 0. */
     val expires: Long = 0,
+    val isVideo: Boolean = false,
+    /** Video length in ms. */
+    val duration: Long = 0,
 )
 
 data class Album(
@@ -35,9 +38,10 @@ data class Album(
 )
 
 object MediaRepository {
-    private val collection: Uri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+    private val imageCollection: Uri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+    private val videoCollection: Uri = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
 
-    /** All images, or with [trashed] only those in the system trash. */
+    /** All photos and videos, or with [trashed] only those in the system trash. */
     suspend fun loadImages(context: Context, trashed: Boolean = false): List<MediaImage> = withContext(Dispatchers.IO) {
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
@@ -61,7 +65,10 @@ object MediaRepository {
             if (trashed) putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY)
         }
         val result = ArrayList<MediaImage>()
-        context.contentResolver.query(collection, projection, queryArgs, null)?.use { c ->
+        // Photos and videos live in separate collections; their ids share one table, so they stay unique.
+        for ((collection, video) in listOf(imageCollection to false, videoCollection to true))
+        context.contentResolver.query(collection, if (video) projection + MediaStore.Video.Media.DURATION else projection, queryArgs, null)?.use { c ->
+            val durCol = c.getColumnIndex(MediaStore.Video.Media.DURATION)
             val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val bucketCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
@@ -99,6 +106,8 @@ object MediaRepository {
                     modified = c.getLong(modCol),
                     isFavorite = c.getInt(favCol) == 1,
                     expires = c.getLong(expCol) * 1000,
+                    isVideo = video,
+                    duration = if (durCol >= 0) c.getLong(durCol) else 0,
                 )
             }
         }

@@ -390,7 +390,14 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                             PillAction(Icons.Rounded.DeleteForever, "Löschen") { ops.deleteForever(selected) }
                         } else {
                             val allFav = selected.isNotEmpty() && selected.all { it.isFavorite }
-                            PillAction(Icons.Rounded.Share, "Teilen") { share(ctx, selected.map { it.uri }) }
+                            PillAction(Icons.Rounded.Share, "Teilen") {
+                                val mime = when {
+                                    selected.all { it.isVideo } -> "video/*"
+                                    selected.none { it.isVideo } -> "image/*"
+                                    else -> "*/*"
+                                }
+                                share(ctx, selected.map { it.uri }, mime)
+                            }
                             PillAction(if (allFav) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder, if (allFav) "Kein Fav." else "Favorit") {
                                 ops.setFavorite(selected, !allFav)
                             }
@@ -580,6 +587,15 @@ private fun PhotoCell(
             Modifier.fillMaxSize().graphicsLayer { scaleX = inset; scaleY = inset }.clip(RoundedCornerShape(corner)),
             size = thumbSize(columns),
         )
+        if (image.isVideo) {
+            Row(
+                Modifier.align(Alignment.BottomEnd).padding(4.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(start = 3.dp, end = 7.dp, top = 1.dp, bottom = 1.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                Text(io.github.carnager.peek.viewer.formatDuration(image.duration), color = Color.White, style = MaterialTheme.typography.labelSmall)
+            }
+        }
         if (image.mimeType == "image/gif") {
             Icon(Icons.Rounded.GifBox, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp).size(18.dp))
         }
