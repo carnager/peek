@@ -425,7 +425,7 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, La
                 item(key = "foldersEmpty", span = ::full) { Hint(stringResource(R.string.gallery_folders_empty)) }
             }
             items(vm.folders, key = { "f:" + it.bucketId }) { a ->
-                AlbumCard(a.name, a.count, a.cover, Modifier.animateItem()) { vm.open = Source.Folder(a.bucketId) }
+                AlbumCard(a.name, a.count, a.cover, Modifier.animateItem(fadeInSpec = null)) { vm.open = Source.Folder(a.bucketId) }
             }
         }
     }

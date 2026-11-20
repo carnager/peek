@@ -562,12 +562,14 @@ fun PhotoGridScreen(
                     span = { c -> if (c is Cell.Header) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
                     contentType = { it::class },
                 ) { c ->
+                    // Entries appear without fading in: a fade that starts while no frames are drawn
+                    // (app start, a tab switch) could stay at invisible until the next scroll.
                     when (c) {
                         is Cell.Header -> Text(
                             c.label,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.animateItem().padding(start = 13.dp, top = 18.dp, bottom = 8.dp),
+                            modifier = Modifier.animateItem(fadeInSpec = null).padding(start = 13.dp, top = 18.dp, bottom = 8.dp),
                         )
                         is Cell.Photo -> PhotoCell(
                             image = c.image,
@@ -577,7 +579,7 @@ fun PhotoGridScreen(
                             showFavorite = !isTrash && source != Source.Favorites,
                             onlyPhone = isTrunk && c.image.remote == null,
                             daysLeft = if (isTrash) c.image.expires.takeIf { it > 0 }?.let { ((it - System.currentTimeMillis()) / DateUtils.DAY_IN_MILLIS).toInt().coerceAtLeast(0) } else null,
-                            modifier = Modifier.animateItem(),
+                            modifier = Modifier.animateItem(fadeInSpec = null),
                             hidden = vm.hero?.image?.id == c.image.id,
                             onBounds = { vm.thumbBounds[c.image.id] = it },
                             onGone = { vm.thumbBounds.remove(c.image.id) },

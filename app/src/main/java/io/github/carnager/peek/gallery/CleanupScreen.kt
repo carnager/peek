@@ -107,7 +107,7 @@ fun CleanupScreen(vm: GalleryViewModel, onClose: () -> Unit) {
                         onPreview = { preview = it },
                         onNotSimilar = { vm.notSimilar(g) },
                         onDelete = { vm.cleanUp(mapOf(g to del)) },
-                        modifier = Modifier.animateItem(),
+                        modifier = Modifier.animateItem(fadeInSpec = null),
                     )
                 }
             }
