@@ -30,7 +30,62 @@ sealed interface Source {
     data object Trunk : Source
     /** An album on the trunk server. */
     data class TrunkAlbum(val id: Long) : Source
+    /** Photos from this day in earlier years; [remote] when they come from trunk. */
+    data class Memories(val remote: Boolean) : Source
 }
+
+/**
+ * "On this day": photos taken on today's date in earlier years, or, when there are none, in the
+ * week around it. Most recent year first, each day in the order it happened.
+ */
+class OnThisDay(val images: List<MediaImage>, val yearsAgo: List<Int>, val wholeWeek: Boolean, val remote: Boolean) {
+    /** "Heute vor 2 Jahren", "Diese Woche vor 1, 3 und 5 Jahren". */
+    val title: String
+        get() {
+            val n = yearsAgo
+            val years = when {
+                n.size == 1 && n[0] == 1 -> "einem Jahr"
+                n.size == 1 -> "${n[0]} Jahren"
+                else -> n.dropLast(1).joinToString(", ") + " und ${n.last()} Jahren"
+            }
+            return (if (wholeWeek) "Diese Woche vor " else "Heute vor ") + years
+        }
+
+    /** A favourite if there is one, else a photo from the middle of the most recent year. */
+    val cover: MediaImage
+        get() = images.firstOrNull { it.isFavorite } ?: images.filter { y -> yearOf(y) == yearOf(images.first()) }.let { it[it.size / 2] }
+
+    /** The town most of them were taken in, if known. */
+    val place: String?
+        get() = images.mapNotNull { it.remote?.city }.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key
+
+    companion object {
+        fun dateOf(img: MediaImage): java.time.LocalDate =
+            java.time.Instant.ofEpochMilli(img.dateTaken).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+
+        private fun yearOf(img: MediaImage) = dateOf(img).year
+
+        fun of(pool: List<MediaImage>, today: java.time.LocalDate, remote: Boolean): OnThisDay? {
+            val past = pool.map { it to dateOf(it) }.filter { it.second.year < today.year }
+            var hits = past.filter { (_, d) -> d.monthValue == today.monthValue && d.dayOfMonth == today.dayOfMonth }
+            var week = false
+            if (hits.isEmpty()) {
+                // The same week in other years; withYear turns 29 February into the 28th.
+                hits = past.filter { (_, d) ->
+                    val days = kotlin.math.abs(java.time.temporal.ChronoUnit.DAYS.between(today, d.withYear(today.year)))
+                    minOf(days, 365 - days) <= 3
+                }
+                week = true
+            }
+            if (hits.isEmpty()) return null
+            val sorted = hits.sortedWith(compareByDescending<Pair<MediaImage, java.time.LocalDate>> { it.second.year }.thenBy { it.first.dateTaken })
+            val ago = sorted.map { today.year - it.second.year }.distinct().sorted()
+            return OnThisDay(sorted.map { it.first }, ago, week, remote)
+        }
+    }
+}
+
+/** Shows photos from the trunk server, so actions go there. */
 
 /** How the trunk library is ordered. */
 enum class TrunkSort(val label: String, val byDate: Boolean) {
@@ -45,7 +100,7 @@ enum class TrunkSort(val label: String, val byDate: Boolean) {
 enum class TrunkFilter(val label: String) { Photos("Fotos"), Videos("Videos"), Favorites("Favoriten") }
 
 /** Shows photos from the trunk server, so actions go there. */
-val Source?.onTrunk: Boolean get() = this == Source.Trunk || this is Source.TrunkAlbum
+val Source?.onTrunk: Boolean get() = this == Source.Trunk || this is Source.TrunkAlbum || (this is Source.Memories && remote)
 
 /** A short message with an optional action, shown as a snackbar. */
 data class Message(val text: String, val action: String? = null, val token: Long = System.nanoTime(), val onAction: (() -> Unit)? = null)
@@ -120,6 +175,12 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var trunkAlbums by mutableStateOf<List<io.github.carnager.peek.trunk.RemoteAlbum>>(emptyList())
         private set
+
+    /** On this day in earlier years: from trunk's library when connected, else from the phone. */
+    val memories: OnThisDay? by androidx.compose.runtime.derivedStateOf {
+        val remote = trunkConnected && trunk.isNotEmpty()
+        OnThisDay.of(if (remote) trunk else images, java.time.LocalDate.now(), remote)
+    }
 
     // Search, filters and order of the trunk library. All offline, on the cached library.
     var trunkQuery by mutableStateOf("")
@@ -363,6 +424,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             images.filter { it.id in ids }
         }
         Source.Trunk -> trunkView
+        is Source.Memories -> memories?.images ?: emptyList()
         is Source.TrunkAlbum -> {
             val album = trunkAlbums.firstOrNull { it.id == source.id }
             if (album == null) emptyList() else {
@@ -383,6 +445,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         is Source.User -> userAlbums.firstOrNull { it.id == source.id }?.name ?: ""
         Source.Trunk -> "trunk"
         is Source.TrunkAlbum -> trunkAlbums.firstOrNull { it.id == source.id }?.name ?: ""
+        is Source.Memories -> memories?.title ?: "Rückblick"
     }
 
     fun reload(then: (() -> Unit)? = null) {

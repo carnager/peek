@@ -370,6 +370,11 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
                 }
             }
 
+            vm.memories?.let { m ->
+                item(key = "memories", span = { GridItemSpan(maxLineSpan) }) {
+                    MemoriesCard(m, Modifier.animateItem()) { vm.open = Source.Memories(m.remote) }
+                }
+            }
             item(key = "trunk", span = { GridItemSpan(maxLineSpan) }) {
                 TrunkCard(vm, upload) { if (vm.trunkConnected) vm.open = Source.Trunk else connecting = true }
             }
@@ -529,6 +534,30 @@ private fun AlbumCard(name: String, count: Int, cover: MediaImage, modifier: Mod
                 overflow = TextOverflow.Ellipsis,
             )
             Text(if (count == 1) "1 Bild" else "$count Bilder", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+/** "Heute vor 2 Jahren": a wide card with a photo from back then, shown only on days that have one. */
+@Composable
+private fun MemoriesCard(m: OnThisDay, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .aspectRatio(2.2f)
+            .bounceClick(pressedScale = 0.95f, onClick = onClick)
+            .clip(RoundedCornerShape(26.dp)),
+    ) {
+        Thumb(m.cover, Modifier.fillMaxSize(), size = 900)
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))))
+        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text("Rückblick", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+            Text(m.title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                listOfNotNull(m.place, if (m.images.size == 1) "1 Bild" else "${m.images.size} Bilder").joinToString(" · "),
+                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
     }
 }

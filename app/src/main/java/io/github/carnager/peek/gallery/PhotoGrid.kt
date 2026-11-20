@@ -608,6 +608,7 @@ private fun EmptyState(source: Source, modifier: Modifier) {
         Source.Trash -> Triple(Icons.Rounded.DeleteOutline, "Papierkorb ist leer", "Gelöschte Bilder landen hier und bleiben 30 Tage wiederherstellbar.")
         is Source.User -> Triple(Icons.Rounded.PhotoAlbum, "Album ist leer", "Wähle Bilder in einem Ordner aus und tippe auf „Album“.")
         is Source.TrunkAlbum -> Triple(Icons.Rounded.PhotoAlbum, "Album ist leer", "Wähle Bilder in trunk aus und tippe auf „Album“.")
+        is Source.Memories -> Triple(Icons.Rounded.History, "Heute kein Rückblick", "An diesem Tag gibt es keine Bilder aus früheren Jahren.")
         else -> Triple(Icons.Rounded.PhotoLibrary, "Keine Bilder", "")
     }
     Column(
