@@ -37,6 +37,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -230,16 +232,30 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
     val trunkAlbum = (source as? Source.TrunkAlbum)?.let { s -> vm.trunkAlbums.firstOrNull { it.id == s.id } }
     LaunchedEffect(source) { if (isTrunk) vm.openTrunk() }
     val userAlbum = (source as? Source.User)?.let { s -> vm.userAlbums.firstOrNull { it.id == s.id } }
-    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkAlbums, source) { vm.imagesOf(source) }
-    val cells = remember(list, isTrash) { cellsOf(list, headers = !isTrash) }
+    // The whole trunk library can be searched, filtered and sorted.
+    val library = source == Source.Trunk
+    var searchOpen by remember { mutableStateOf(library && vm.trunkSearching) }
+    var sortMenu by remember { mutableStateOf(false) }
+    val list = remember(vm.images, vm.trash, vm.userAlbums, vm.trunk, vm.trunkAlbums, vm.trunkQuery, vm.trunkSort, vm.trunkFilters, source) { vm.imagesOf(source) }
+    val dayHeaders = !isTrash && (!library || vm.trunkSort.byDate)
+    val cells = remember(list, dayHeaders) { cellsOf(list, headers = dayHeaders) }
     val latestCells by rememberUpdatedState(cells)
     val selecting = vm.selection.isNotEmpty()
     val selected = remember(list, vm.selection) { list.filter { it.id in vm.selection } }
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var confirmEmpty by remember { mutableStateOf(false) }
+    fun closeSearch() {
+        searchOpen = false
+        vm.trunkQuery = ""
+        vm.trunkFilters = emptySet()
+    }
     BackHandler {
-        if (selecting) vm.selection = emptySet() else vm.open = null
+        when {
+            selecting -> vm.selection = emptySet()
+            searchOpen -> closeSearch()
+            else -> vm.open = null
+        }
     }
     val grid = rememberLazyGridState()
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -264,6 +280,7 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
+            Column {
             LargeTopAppBar(
                 navigationIcon = {
                     if (selecting) {
@@ -276,6 +293,8 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                     AnimatedContent(selecting, label = "title") { sel ->
                         if (sel) {
                             Text("${vm.selection.size} ausgewählt")
+                        } else if (searchOpen) {
+                            SearchField(vm.trunkQuery, onChange = { vm.trunkQuery = it }, count = list.size)
                         } else {
                             Text(vm.titleOf(source), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -285,7 +304,28 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                     if (selecting) {
                         IconButton(onClick = { vm.selection = list.mapTo(HashSet()) { it.id } }) { Icon(Icons.Rounded.SelectAll, "Alle auswählen") }
                     } else if (isTrunk) {
-                        if (vm.trunkSyncing) {
+                        if (library) {
+                            if (searchOpen) {
+                                IconButton(onClick = ::closeSearch) { Icon(Icons.Rounded.Close, "Suche schließen") }
+                            } else {
+                                IconButton(onClick = { searchOpen = true }) { Icon(Icons.Rounded.Search, "Suchen") }
+                            }
+                            Box {
+                                IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Rounded.Sort, "Sortieren") }
+                                DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }, shape = RoundedCornerShape(20.dp)) {
+                                    TrunkSort.entries.forEach { s ->
+                                        DropdownMenuItem(
+                                            text = { Text(s.label) },
+                                            leadingIcon = { RadioButton(selected = vm.trunkSort == s, onClick = null) },
+                                            onClick = { sortMenu = false; vm.trunkSort = s },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (searchOpen) {
+                            // Room for the search field; refresh comes back when the search closes.
+                        } else if (vm.trunkSyncing) {
                             CircularProgressIndicator(Modifier.padding(12.dp).size(22.dp), strokeWidth = 2.5.dp)
                         } else {
                             IconButton(onClick = vm::syncTrunk) { Icon(Icons.Rounded.Refresh, "Aktualisieren") }
@@ -331,10 +371,41 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
             )
+            if (library && searchOpen && !selecting) {
+                Row(
+                    Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TrunkFilter.entries.forEach { f ->
+                        val on = f in vm.trunkFilters
+                        FilterChip(
+                            selected = on,
+                            onClick = {
+                                vm.trunkFilters = when {
+                                    on -> vm.trunkFilters - f
+                                    // Photos and videos exclude each other.
+                                    f == TrunkFilter.Photos -> vm.trunkFilters - TrunkFilter.Videos + f
+                                    f == TrunkFilter.Videos -> vm.trunkFilters - TrunkFilter.Photos + f
+                                    else -> vm.trunkFilters + f
+                                }
+                            },
+                            label = { Text(f.label) },
+                        )
+                    }
+                }
+            }
+            }
         },
     ) { pad ->
         Box(Modifier.fillMaxSize()) {
-            if (vm.loaded && list.isEmpty()) {
+            if (library && vm.trunkSearching && list.isEmpty()) {
+                Text(
+                    "Nichts gefunden",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            } else if (vm.loaded && list.isEmpty()) {
                 EmptyState(source, Modifier.padding(pad))
             }
             LazyVerticalGrid(
@@ -499,6 +570,34 @@ fun PhotoGridScreen(vm: GalleryViewModel, ops: MediaOps, source: Source) {
             },
             dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text("Abbrechen") } },
         )
+    }
+}
+
+/** The search field in the title bar; says how many photos match. */
+@Composable
+private fun SearchField(query: String, onChange: (String) -> Unit, count: Int) {
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { if (query.isEmpty()) focus.requestFocus() }
+    Column {
+        androidx.compose.foundation.text.BasicTextField(
+            value = query,
+            onValueChange = onChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.titleLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            decorationBox = { inner ->
+                Box {
+                    if (query.isEmpty()) {
+                        Text("Ort, Jahr, Monat, Beschreibung …", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    inner()
+                }
+            },
+        )
+        if (query.isNotBlank()) {
+            Text(if (count == 1) "1 Treffer" else "$count Treffer", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

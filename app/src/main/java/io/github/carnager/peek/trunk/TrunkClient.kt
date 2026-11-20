@@ -113,8 +113,29 @@ data class RemoteAsset(
     /** Edited on trunk; the first upload is kept and can be restored. */
     val edited: Boolean,
     val updatedAt: String?,
+    /** When it arrived on trunk (ms), for "recently added". */
+    val createdAt: Long,
+    /** Nearest town, in the phone's language; see trunk's docs/api.md. */
+    val city: String?,
+    val region: String?,
+    val country: String?,
+    val caption: String?,
     val json: JSONObject,
 ) {
+    /** "Wien, Österreich", or null without a known place. */
+    val placeLine: String?
+        get() = listOfNotNull(city, region, country).takeIf { it.isNotEmpty() }?.joinToString(", ")
+
+    /** Everything a search can match, in lower case: name, caption, place, camera, year and month. */
+    val searchText: String by lazy {
+        val month = localTime?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() }?.let { t ->
+            "${t.year} ${t.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())} " +
+                t.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+        }
+        listOfNotNull(name, caption, city, region, country, make, model, lens, month, if (isVideo) "video" else "foto")
+            .joinToString(" ").lowercase()
+    }
+
     val isVideo get() = kind == "video"
 
     /** Short tag for cache-busting URLs. */
@@ -149,6 +170,11 @@ data class RemoteAsset(
                 sha256 = s("sha256") ?: "",
                 edited = s("edited_at") != null,
                 updatedAt = s("updated_at"),
+                createdAt = s("created_at")?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0,
+                city = o.optJSONObject("place")?.optString("city")?.ifEmpty { null },
+                region = o.optJSONObject("place")?.optString("region")?.ifEmpty { null },
+                country = o.optJSONObject("place")?.optString("country")?.ifEmpty { null },
+                caption = s("caption"),
                 json = o,
             )
         }
@@ -188,6 +214,8 @@ object TrunkClient {
             .addInterceptor { chain ->
                 val req = chain.request()
                 val b = req.newBuilder().header("User-Agent", "peek/${io.github.carnager.peek.BuildConfig.VERSION_NAME} (Android photo gallery)")
+                    // Place names come back in the phone's language.
+                    .header("Accept-Language", java.util.Locale.getDefault().toLanguageTag())
                 val t = TrunkAccount.token
                 if (t != null && TrunkAccount.owns(req.url.toString())) b.header("Authorization", "Bearer $t")
                 chain.proceed(b.build())
@@ -268,6 +296,10 @@ object TrunkClient {
 
     suspend fun deleteAlbum(id: Long) = withContext(Dispatchers.IO) {
         call(Request.Builder().url(TrunkAccount.api("/albums/$id")).delete().build())
+    }
+
+    suspend fun setCaption(id: Long, caption: String): JSONObject = withContext(Dispatchers.IO) {
+        call(Request.Builder().url(TrunkAccount.api("/assets/$id")).patch(JSONObject().put("caption", caption).toString().toRequestBody(json)).build())
     }
 
     suspend fun setFavorite(id: Long, favorite: Boolean): JSONObject = withContext(Dispatchers.IO) {

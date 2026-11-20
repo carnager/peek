@@ -32,6 +32,18 @@ sealed interface Source {
     data class TrunkAlbum(val id: Long) : Source
 }
 
+/** How the trunk library is ordered. */
+enum class TrunkSort(val label: String, val byDate: Boolean) {
+    Newest("Neueste zuerst", true),
+    Oldest("Älteste zuerst", true),
+    Added("Zuletzt hinzugefügt", false),
+    Name("Name", false),
+    Size("Größte zuerst", false),
+}
+
+/** What the trunk library can be narrowed to. */
+enum class TrunkFilter(val label: String) { Photos("Fotos"), Videos("Videos"), Favorites("Favoriten") }
+
 /** Shows photos from the trunk server, so actions go there. */
 val Source?.onTrunk: Boolean get() = this == Source.Trunk || this is Source.TrunkAlbum
 
@@ -108,6 +120,39 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var trunkAlbums by mutableStateOf<List<io.github.carnager.peek.trunk.RemoteAlbum>>(emptyList())
         private set
+
+    // Search, filters and order of the trunk library. All offline, on the cached library.
+    var trunkQuery by mutableStateOf("")
+    var trunkSort by mutableStateOf(TrunkSort.Newest)
+    var trunkFilters by mutableStateOf(emptySet<TrunkFilter>())
+    val trunkSearching get() = trunkQuery.isNotBlank() || trunkFilters.isNotEmpty()
+
+    /**
+     * The trunk library as shown: every word of the query must turn up somewhere (name, caption,
+     * place, camera, year, month, or an album the photo is in), then the filters, then the order.
+     */
+    private val trunkView by androidx.compose.runtime.derivedStateOf { trunkShown() } // recomputed only when an input changes
+
+    private fun trunkShown(): List<MediaImage> {
+        val words = trunkQuery.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val albumsOf = if (words.isEmpty()) emptyMap() else HashMap<Long, StringBuilder>().also { m ->
+            trunkAlbums.forEach { a -> a.assetIds.forEach { id -> m.getOrPut(id) { StringBuilder() }.append(' ').append(a.name.lowercase()) } }
+        }
+        val f = trunkFilters
+        val list = trunk.filter { img ->
+            val r = img.remote!!
+            (TrunkFilter.Photos !in f || !r.isVideo) && (TrunkFilter.Videos !in f || r.isVideo) &&
+                (TrunkFilter.Favorites !in f || r.favorite) &&
+                words.all { w -> w in r.searchText || albumsOf[r.id]?.contains(w) == true }
+        }
+        return when (trunkSort) {
+            TrunkSort.Newest -> list // the library comes newest first
+            TrunkSort.Oldest -> list.reversed()
+            TrunkSort.Added -> list.sortedByDescending { it.remote!!.createdAt }
+            TrunkSort.Name -> list.sortedBy { it.name.lowercase() }
+            TrunkSort.Size -> list.sortedByDescending { it.size }
+        }
+    }
 
     private fun RemoteAsset.toImage() = MediaImage(
         // Negative ids keep server photos apart from MediaStore ones in selections and animations.
@@ -282,6 +327,12 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun trunkCaption(image: MediaImage, caption: String) = trunkCall {
+        val id = image.remote?.id ?: return@trunkCall
+        TrunkLibrary.put(getApplication(), TrunkClient.setCaption(id, caption))
+        trunk = TrunkLibrary.cached(getApplication()).map { it.toImage() }
+    }
+
     /** Back to the photo as first uploaded. */
     fun trunkRevertEdit(image: MediaImage) = trunkCall {
         val id = image.remote?.id ?: return@trunkCall
@@ -311,7 +362,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
             val ids = userAlbums.firstOrNull { it.id == source.id }?.ids?.toHashSet() ?: emptySet()
             images.filter { it.id in ids }
         }
-        Source.Trunk -> trunk
+        Source.Trunk -> trunkView
         is Source.TrunkAlbum -> {
             val album = trunkAlbums.firstOrNull { it.id == source.id }
             if (album == null) emptyList() else {

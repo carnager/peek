@@ -148,6 +148,8 @@ fun ImageViewer(
     onShare: ((ViewerItem) -> Unit)? = null,
     /** Offered for [ViewerItem.edited] items: go back to the first upload. */
     onRevertEdit: ((ViewerItem) -> Unit)? = null,
+    /** Saves a caption; null where captions cannot be stored (phone photos). */
+    onCaption: ((ViewerItem, String) -> Unit)? = null,
 ) {
     if (items.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
@@ -332,7 +334,9 @@ fun ImageViewer(
     info?.let { item ->
         // Always fully open, so one back gesture closes it instead of first halving it.
         ModalBottomSheet(onDismissRequest = { info = null }, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-            InfoSheet(item)
+            // The live item, so a caption just saved shows at once.
+            val live = items.firstOrNull { it.uri == item.uri } ?: item
+            InfoSheet(live, onCaption = onCaption?.takeIf { live.remote }?.let { save -> { c: String -> save(live, c) } })
         }
     }
 }

@@ -69,6 +69,9 @@ data class PhotoMeta(
     val lon: Double? = null,
     val altitude: Double? = null,
     val software: String? = null,
+    /** Already known place name (from trunk), so no geocoder is asked. */
+    val place: String? = null,
+    val caption: String? = null,
 )
 
 private fun hasMediaLocation(ctx: Context) =
@@ -133,7 +136,7 @@ private suspend fun placeName(ctx: Context, lat: Double, lon: Double): String? {
 }
 
 @Composable
-fun InfoSheet(item: ViewerItem) {
+fun InfoSheet(item: ViewerItem, onCaption: ((String) -> Unit)? = null) {
     val ctx = LocalContext.current
     var granted by remember { mutableStateOf(hasMediaLocation(ctx)) }
     val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
@@ -144,7 +147,8 @@ fun InfoSheet(item: ViewerItem) {
             askLocation.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
         }
     }
-    val meta by produceState(PhotoMeta(), item.uri, granted) {
+    // Keyed on meta too: a caption saved from this sheet arrives as new meta for the same photo.
+    val meta by produceState(item.meta ?: PhotoMeta(), item.uri, granted, item.meta) {
         value = item.meta ?: if (item.isVideo) PhotoMeta() else withContext(Dispatchers.IO) { readMeta(ctx, item.uri) }
     }
 
@@ -170,6 +174,35 @@ fun InfoSheet(item: ViewerItem) {
             overflow = TextOverflow.MiddleEllipsis,
             modifier = Modifier.padding(top = 6.dp),
         )
+
+        // Caption: shown when there is one; editable where the photo lives on trunk.
+        var editCaption by remember { mutableStateOf(false) }
+        val caption = meta.caption
+        if (caption != null || onCaption != null) {
+            Text(
+                caption ?: "Beschreibung hinzufügen",
+                style = if (caption != null) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                color = if (caption != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 12.dp).then(
+                    if (onCaption != null) Modifier.clip(RoundedCornerShape(8.dp)).bounceClick(pressedScale = 0.98f) { editCaption = true } else Modifier,
+                ),
+            )
+        }
+        if (editCaption && onCaption != null) {
+            var text by remember { mutableStateOf(caption ?: "") }
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { editCaption = false },
+                title = { Text("Beschreibung") },
+                text = {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = text, onValueChange = { text = it },
+                        modifier = Modifier.fillMaxWidth(), minLines = 2,
+                    )
+                },
+                confirmButton = { androidx.compose.material3.TextButton(onClick = { onCaption(text.trim()); editCaption = false }) { Text("Speichern") } },
+                dismissButton = { androidx.compose.material3.TextButton(onClick = { editCaption = false }) { Text("Abbrechen") } },
+            )
+        }
 
         // Quick facts.
         Row(Modifier.padding(top = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -217,7 +250,7 @@ fun InfoSheet(item: ViewerItem) {
         val lat = meta.lat
         val lon = meta.lon
         if (lat != null && lon != null) {
-            val place by produceState<String?>(null, lat, lon) { value = placeName(ctx, lat, lon) }
+            val place by produceState(meta.place, lat, lon, meta.place) { value = meta.place ?: placeName(ctx, lat, lon) }
             Card(padding = 0.dp) {
                 MapTiles(lat, lon, Modifier.fillMaxWidth().height(180.dp)) {
                     val geo = Uri.parse("geo:$lat,$lon?q=$lat,$lon")

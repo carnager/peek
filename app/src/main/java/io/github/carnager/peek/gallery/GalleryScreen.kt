@@ -99,6 +99,8 @@ fun MediaImage.toViewerItem(placeholderKey: String? = null) = ViewerItem(
             lat = r.lat,
             lon = r.lon,
             altitude = r.alt,
+            place = r.placeLine,
+            caption = r.caption,
         )
     },
 )
@@ -184,6 +186,9 @@ fun GalleryScreen(vm: GalleryViewModel, ops: MediaOps) {
                                 list.firstOrNull { it.uri == item.uri }?.let {
                                     if (it.remote != null) vm.trunkFavorite(listOf(it), !it.isFavorite) else ops.setFavorite(listOf(it), !it.isFavorite)
                                 }
+                            },
+                            onCaption = if (!vm.open.onTrunk) null else { item, caption ->
+                                list.firstOrNull { it.uri == item.uri }?.let { vm.trunkCaption(it, caption) }
                             },
                             onRevertEdit = if (!vm.open.onTrunk) null else { item ->
                                 list.firstOrNull { it.uri == item.uri }?.let { vm.trunkRevertEdit(it) }
@@ -328,14 +333,8 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
             )
         },
     ) { pad ->
-        if (vm.loaded && vm.images.isEmpty() && vm.trash.isEmpty()) {
-            Column(Modifier.fillMaxSize().padding(pad), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(io.github.carnager.peek.R.drawable.mascot), null, Modifier.size(width = 120.dp, height = 84.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("Noch keine Bilder hier", style = MaterialTheme.typography.titleMedium)
-            }
-            return@Scaffold
-        }
+        // An empty phone still has its way to trunk: only the phone's part says it is empty.
+        val phoneEmpty = vm.loaded && vm.images.isEmpty() && vm.trash.isEmpty()
         LazyVerticalGrid(
             state = grid,
             columns = GridCells.Adaptive(160.dp),
@@ -346,6 +345,15 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grid: LazyGridStat
             if (!canManage && !vm.manageMediaHintDismissed && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                 item(key = "hint", span = { GridItemSpan(maxLineSpan) }) {
                     ManageMediaHint(onAllow = ops::requestManageMedia, onDismiss = vm::dismissManageMediaHint)
+                }
+            }
+            if (phoneEmpty) {
+                item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(io.github.carnager.peek.R.drawable.mascot), null, Modifier.size(width = 120.dp, height = 84.dp))
+                        Spacer(Modifier.height(12.dp))
+                        Text("Noch keine Bilder auf dem Handy", style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
             if (vm.images.isNotEmpty()) {
