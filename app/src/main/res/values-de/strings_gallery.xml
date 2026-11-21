@@ -295,4 +295,10 @@
     <string name="gallery_upload">Hochladen</string>
     <string name="gallery_albums_phone">Alben auf dem Handy</string>
     <string name="gallery_only_phone_count">Nur auf dem Handy · %1$d</string>
+    <string name="gallery_delete_folder">Ordner löschen</string>
+    <string name="gallery_delete_folder_title">„%1$s“ löschen?</string>
+    <plurals name="gallery_delete_folder_text">
+        <item quantity="one">Das Foto kommt in den Papierkorb und lässt sich dort 30 Tage lang wiederherstellen.</item>
+        <item quantity="other">Die %1$d Fotos und Videos kommen in den Papierkorb und lassen sich dort 30 Tage lang wiederherstellen.</item>
+    </plurals>
 </resources>

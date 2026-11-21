@@ -388,6 +388,7 @@ internal fun RootActions(vm: GalleryViewModel) {
 private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, LazyGridState>, tabBar: @Composable () -> Unit) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val t = vm.tab
+    var deleting by remember { mutableStateOf<Long?>(null) }
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
@@ -426,10 +427,35 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, La
                 item(key = "foldersEmpty", span = ::full) { Hint(stringResource(R.string.gallery_folders_empty)) }
             }
             items(vm.folders, key = { "f:" + it.bucketId }) { a ->
-                AlbumCard(a.name, a.count, a.cover, Modifier.animateItem(fadeInSpec = null)) { vm.open = Source.Folder(a.bucketId) }
+                AlbumCard(a.name, a.count, a.cover, Modifier.animateItem(fadeInSpec = null), onLongClick = { deleting = a.bucketId }) {
+                    vm.open = Source.Folder(a.bucketId)
+                }
             }
         }
     }
+    deleting?.let { id -> DeleteFolderDialog(vm, ops, id) { deleting = null } }
+}
+
+/**
+ * Deletes a folder: everything in it goes to the phone's trash, from where it can be restored for
+ * 30 days. The folder disappears with its last photo.
+ */
+@Composable
+internal fun DeleteFolderDialog(vm: GalleryViewModel, ops: MediaOps, bucketId: Long, onDone: (deleted: Boolean) -> Unit) {
+    val name = vm.folders.firstOrNull { it.bucketId == bucketId }?.name ?: ""
+    val images = vm.imagesOf(Source.Folder(bucketId))
+    AlertDialog(
+        onDismissRequest = { onDone(false) },
+        shape = RoundedCornerShape(28.dp),
+        title = { Text(stringResource(R.string.gallery_delete_folder_title, name)) },
+        text = { Text(pluralStringResource(R.plurals.gallery_delete_folder_text, images.size, images.size)) },
+        confirmButton = {
+            Button(onClick = { ops.trash(images); onDone(true) }, enabled = images.isNotEmpty()) {
+                Text(stringResource(R.string.gallery_delete))
+            }
+        },
+        dismissButton = { TextButton(onClick = { onDone(false) }) { Text(stringResource(R.string.gallery_cancel)) } },
+    )
 }
 
 @Composable
@@ -726,12 +752,12 @@ private fun ManageMediaHint(onAllow: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun AlbumCard(name: String, count: Int, cover: MediaImage, modifier: Modifier = Modifier, aspect: Float = 1f, shared: Boolean = false, onClick: () -> Unit) {
+private fun AlbumCard(name: String, count: Int, cover: MediaImage, modifier: Modifier = Modifier, aspect: Float = 1f, shared: Boolean = false, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     Box(
         modifier
             .fillMaxWidth()
             .aspectRatio(aspect)
-            .bounceClick(pressedScale = 0.95f, onClick = onClick)
+            .bounceClick(pressedScale = 0.95f, onLongClick = onLongClick, onClick = onClick)
             .clip(RoundedCornerShape(26.dp)),
     ) {
         Thumb(cover, Modifier.fillMaxSize(), size = if (aspect > 1f) 900 else 450)

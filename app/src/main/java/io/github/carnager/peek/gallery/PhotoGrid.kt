@@ -280,6 +280,10 @@ fun PhotoGridScreen(
     var askContentDownload by remember { mutableStateOf(false) }
     var confirmEnd by remember { mutableStateOf(false) }
     var confirmEmpty by remember { mutableStateOf(false) }
+    var deletingFolder by remember { mutableStateOf(false) }
+    if (deletingFolder && source is Source.Folder) {
+        DeleteFolderDialog(vm, ops, source.bucketId) { deleted -> deletingFolder = false; if (deleted) vm.open = null }
+    }
     fun closeSearch() {
         searchOpen = false
         vm.trunkQuery = ""
@@ -445,6 +449,17 @@ fun PhotoGridScreen(
                         }
                     } else if (isTrash && list.isNotEmpty()) {
                         TextButton(onClick = { confirmEmpty = true }) { Text(stringResource(R.string.gallery_empty_trash)) }
+                    } else if (source is Source.Folder && list.isNotEmpty()) {
+                        Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.gallery_more)) }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_delete_folder)) },
+                                    leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
+                                    onClick = { menu = false; deletingFolder = true },
+                                )
+                            }
+                        }
                     } else if (userAlbum != null) {
                         Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.gallery_more)) }

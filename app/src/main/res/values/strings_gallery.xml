@@ -297,4 +297,10 @@
     <string name="gallery_upload">Upload</string>
     <string name="gallery_albums_phone">Albums on this phone</string>
     <string name="gallery_only_phone_count">Only on phone · %1$d</string>
+    <string name="gallery_delete_folder">Delete folder</string>
+    <string name="gallery_delete_folder_title">Delete “%1$s”?</string>
+    <plurals name="gallery_delete_folder_text">
+        <item quantity="one">Its photo goes to the trash and can be restored there for 30 days.</item>
+        <item quantity="other">Its %1$d photos and videos go to the trash and can be restored there for 30 days.</item>
+    </plurals>
 </resources>
