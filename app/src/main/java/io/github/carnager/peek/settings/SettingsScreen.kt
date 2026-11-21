@@ -43,6 +43,7 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
     var pickTime by remember { mutableStateOf(false) }
     var pickFolders by remember { mutableStateOf(false) }
     var pickHidden by remember { mutableStateOf(false) }
+    var pickFeed by remember { mutableStateOf(false) }
     var uploadLimit by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
     var limitLabel by remember { mutableStateOf(uploadLimitLabel(ctx)) }
@@ -88,6 +89,12 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
                 }
 
                 item { Section(stringResource(R.string.settings_folders_section)) }
+                // Without trunk, the timeline is the phone's: all folders, or only the watched ones.
+                if (!vm.trunkConnected) item {
+                    Row(stringResource(R.string.settings_local_feed),
+                        if (vm.feedWatchedOnly) stringResource(R.string.settings_local_feed_watched, vm.watchedFolderNames.joinToString(", ").ifEmpty { "–" })
+                        else stringResource(R.string.settings_local_feed_all)) { pickFeed = true }
+                }
                 item {
                     val names = vm.folders.filter { it.bucketId in vm.hiddenFolders }.map { it.name }
                     Row(stringResource(R.string.settings_hidden_folders), when {
@@ -153,6 +160,30 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
         FolderPicker(vm, stringResource(R.string.settings_folders), stringResource(R.string.settings_folders_explain), review.buckets, { pickFolders = false }) {
             saveReview(review.copy(buckets = it))
         }
+    }
+    if (pickFeed) {
+        AlertDialog(
+            onDismissRequest = { pickFeed = false },
+            title = { Text(stringResource(R.string.settings_local_feed)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.settings_local_feed_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 12.dp))
+                    listOf(
+                        false to stringResource(R.string.settings_local_feed_all),
+                        true to stringResource(R.string.settings_local_feed_watched, vm.watchedFolderNames.joinToString(", ").ifEmpty { "–" }),
+                    ).forEach { (on, label) ->
+                        androidx.compose.foundation.layout.Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).bounceClick(pressedScale = 0.98f) { vm.setFeedWatched(on); pickFeed = false }.padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = vm.feedWatchedOnly == on, onClick = null)
+                            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pickFeed = false }) { Text(stringResource(R.string.settings_ok)) } },
+        )
     }
     if (pickHidden) {
         FolderPicker(vm, stringResource(R.string.settings_hidden_folders), stringResource(R.string.settings_hidden_folders_explain), vm.hiddenFolders, { pickHidden = false }) {

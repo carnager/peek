@@ -120,4 +120,8 @@
     <string name="settings_hidden_folders">Ausgeblendete Ordner</string>
     <string name="settings_hidden_folders_none">Keine</string>
     <string name="settings_hidden_folders_explain">Ausgeblendete Ordner fehlen im Ordner-Tab und in der Zeitleiste. Ihre Fotos bleiben auf dem Handy.</string>
+    <string name="settings_local_feed">Lokaler Feed</string>
+    <string name="settings_local_feed_all">Alle Ordner</string>
+    <string name="settings_local_feed_watched">Nur überwachte Ordner (%1$s)</string>
+    <string name="settings_local_feed_explain">Was der Fotos-Tab zeigt, solange kein trunk verbunden ist. Ausgeblendete Ordner fehlen immer.</string>
 </resources>

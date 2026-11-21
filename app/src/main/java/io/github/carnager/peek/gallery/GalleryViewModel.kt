@@ -139,8 +139,22 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The phone's photos without the hidden folders: the timeline, memories, the trunk timeline's phone-only ones. */
     private val feedImages by androidx.compose.runtime.derivedStateOf {
-        if (hiddenFolders.isEmpty()) images else images.filter { it.bucketId !in hiddenFolders }
+        val watched = if (feedWatchedOnly) uploadFolders else null
+        if (hiddenFolders.isEmpty() && watched == null) images
+        else images.filter { it.bucketId !in hiddenFolders && (watched == null || it.bucketId in watched) }
     }
+
+    /** Without trunk: the timeline shows only the watched folders (the camera's, by default), not all. */
+    var feedWatchedOnly by mutableStateOf(app.getSharedPreferences("gallery", 0).getBoolean("feed_watched", false))
+        private set
+
+    fun setFeedWatched(on: Boolean) {
+        feedWatchedOnly = on
+        getApplication<Application>().getSharedPreferences("gallery", 0).edit().putBoolean("feed_watched", on).apply()
+    }
+
+    /** The folders "watched folders only" stands for: the chosen ones, else the camera's. */
+    val watchedFolderNames: List<String> get() = uploadFolders.let { ids -> folders.filter { it.bucketId in ids }.map { it.name } }
 
     fun hideFolders(ids: Set<Long>) {
         hiddenFolders = ids

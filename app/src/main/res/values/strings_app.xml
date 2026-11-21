@@ -120,4 +120,8 @@
     <string name="settings_hidden_folders">Hidden folders</string>
     <string name="settings_hidden_folders_none">None</string>
     <string name="settings_hidden_folders_explain">Hidden folders are left out of the Folders tab and the timeline. Their photos stay on the phone.</string>
+    <string name="settings_local_feed">Local feed</string>
+    <string name="settings_local_feed_all">All folders</string>
+    <string name="settings_local_feed_watched">Watched folders only (%1$s)</string>
+    <string name="settings_local_feed_explain">What the Photos tab shows while no trunk is connected. Hidden folders are always left out.</string>
 </resources>
