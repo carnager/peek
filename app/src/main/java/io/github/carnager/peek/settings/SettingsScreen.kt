@@ -42,6 +42,7 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
     fun saveReview(s: Review.Settings) = vm.saveReviewSettings(s)
     var pickTime by remember { mutableStateOf(false) }
     var pickFolders by remember { mutableStateOf(false) }
+    var pickHidden by remember { mutableStateOf(false) }
     var uploadLimit by remember { mutableStateOf(false) }
     var connecting by remember { mutableStateOf(false) }
     var limitLabel by remember { mutableStateOf(uploadLimitLabel(ctx)) }
@@ -84,6 +85,16 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
                         onClose()
                         vm.startReview()
                     }
+                }
+
+                item { Section(stringResource(R.string.settings_folders_section)) }
+                item {
+                    val names = vm.folders.filter { it.bucketId in vm.hiddenFolders }.map { it.name }
+                    Row(stringResource(R.string.settings_hidden_folders), when {
+                        names.isEmpty() -> stringResource(R.string.settings_hidden_folders_none)
+                        names.size <= 3 -> names.joinToString(", ")
+                        else -> pluralStringResource(R.plurals.settings_folders_count, names.size, names.size)
+                    }) { pickHidden = true }
                 }
 
                 item { Section("trunk") }
@@ -139,37 +150,14 @@ fun SettingsScreen(vm: GalleryViewModel, ops: MediaOps, onClose: () -> Unit) {
         )
     }
     if (pickFolders) {
-        var chosen by remember { mutableStateOf(review.buckets) }
-        AlertDialog(
-            onDismissRequest = { pickFolders = false },
-            title = { Text(stringResource(R.string.settings_folders)) },
-            text = {
-                LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                    items(vm.folders, key = { it.bucketId }) { f ->
-                        val on = f.bucketId in chosen
-                        androidx.compose.foundation.layout.Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).bounceClick(pressedScale = 0.98f) {
-                                chosen = if (on) chosen - f.bucketId else chosen + f.bucketId
-                            }.padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(checked = on, onCheckedChange = null)
-                            Column(Modifier.padding(start = 8.dp)) {
-                                Text(f.name, style = MaterialTheme.typography.bodyLarge)
-                                Text("${f.count}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    saveReview(review.copy(buckets = chosen))
-                    pickFolders = false
-                }) { Text(stringResource(R.string.settings_ok)) }
-            },
-            dismissButton = { TextButton(onClick = { pickFolders = false }) { Text(stringResource(R.string.settings_cancel)) } },
-        )
+        FolderPicker(vm, stringResource(R.string.settings_folders), stringResource(R.string.settings_folders_explain), review.buckets, { pickFolders = false }) {
+            saveReview(review.copy(buckets = it))
+        }
+    }
+    if (pickHidden) {
+        FolderPicker(vm, stringResource(R.string.settings_hidden_folders), stringResource(R.string.settings_hidden_folders_explain), vm.hiddenFolders, { pickHidden = false }) {
+            vm.hideFolders(it)
+        }
     }
     if (uploadLimit) UploadLimitDialog {
         uploadLimit = false
@@ -220,4 +208,38 @@ private fun Row(
 @Composable
 private fun SwitchRow(title: String, subtitle: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(title, subtitle, trailing = { Switch(checked = checked, onCheckedChange = null) }) { onChange(!checked) }
+}
+
+/** Folders to tick, with a line saying what ticking means. */
+@Composable
+private fun FolderPicker(vm: GalleryViewModel, title: String, explain: String, initial: Set<Long>, onDismiss: () -> Unit, onSave: (Set<Long>) -> Unit) {
+    var chosen by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Text(explain, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 12.dp))
+                LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                    items(vm.folders, key = { it.bucketId }) { f ->
+                        val on = f.bucketId in chosen
+                        androidx.compose.foundation.layout.Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).bounceClick(pressedScale = 0.98f) {
+                                chosen = if (on) chosen - f.bucketId else chosen + f.bucketId
+                            }.padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = on, onCheckedChange = null)
+                            Column(Modifier.padding(start = 8.dp)) {
+                                Text(f.name, style = MaterialTheme.typography.bodyLarge)
+                                Text("${f.count}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(chosen); onDismiss() }) { Text(stringResource(R.string.settings_ok)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_cancel)) } },
+    )
 }

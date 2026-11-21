@@ -128,6 +128,35 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var folders by mutableStateOf<List<Album>>(emptyList())
         private set
+
+    /** Folders kept out of the Folders tab and the phone's timeline, e.g. music covers. */
+    var hiddenFolders by mutableStateOf(
+        app.getSharedPreferences("gallery", 0).getStringSet("hidden_folders", emptySet())!!.mapNotNullTo(HashSet()) { it.toLongOrNull() } as Set<Long>
+    )
+        private set
+
+    val shownFolders: List<Album> get() = folders.filter { it.bucketId !in hiddenFolders }
+
+    /** The phone's photos without the hidden folders: the timeline, memories, the trunk timeline's phone-only ones. */
+    private val feedImages by androidx.compose.runtime.derivedStateOf {
+        if (hiddenFolders.isEmpty()) images else images.filter { it.bucketId !in hiddenFolders }
+    }
+
+    fun hideFolders(ids: Set<Long>) {
+        hiddenFolders = ids
+        getApplication<Application>().getSharedPreferences("gallery", 0).edit()
+            .putStringSet("hidden_folders", ids.mapTo(HashSet()) { it.toString() }).apply()
+        refreshPhoneOnly()
+    }
+
+    /** Hides folders, with a way to undo it. */
+    fun hideFolder(ids: Set<Long>) {
+        val names = folders.filter { it.bucketId in ids }.map { it.name }
+        hideFolders(hiddenFolders + ids)
+        if ((open as? Source.Folder)?.bucketId in ids) open = null
+        val text = if (names.size == 1) str(R.string.gallery_folder_hidden, names[0]) else plural(R.plurals.gallery_folders_hidden, names.size, names.size)
+        message = Message(text, str(R.string.gallery_undo)) { hideFolders(hiddenFolders - ids) }
+    }
     var trash by mutableStateOf<List<MediaImage>>(emptyList())
         private set
     var userAlbums by mutableStateOf(UserAlbums.load(app))
@@ -230,7 +259,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
     private var myTrunkId: Long? = null
 
     /** On this day in earlier years, from the phone's photos (Handy tab) and from trunk's (trunk tab). */
-    val phoneMemories: OnThisDay? by androidx.compose.runtime.derivedStateOf { OnThisDay.of(images, java.time.LocalDate.now(), false) }
+    val phoneMemories: OnThisDay? by androidx.compose.runtime.derivedStateOf { OnThisDay.of(feedImages, java.time.LocalDate.now(), false) }
     val trunkMemories: OnThisDay? by androidx.compose.runtime.derivedStateOf {
         if (trunkConnected) OnThisDay.of(trunk, java.time.LocalDate.now(), true) else null
     }
@@ -331,7 +360,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
                 phoneOnlyAgain = false
                 kotlinx.coroutines.delay(800)
                 val folders = uploadFolders
-                val local = images.filter { it.bucketId in folders }
+                val local = feedImages.filter { it.bucketId in folders }
                 val remote = trunkAll.mapNotNull { it.remote }
                 // Photos still waiting for the review are new: shown before any file is read.
                 val waiting = reviewPending.mapTo(HashSet()) { it.id }
@@ -877,7 +906,7 @@ class GalleryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun imagesOf(source: Source?): List<MediaImage> = when (source) {
         null -> emptyList()
-        Source.All -> images
+        Source.All -> feedImages
         Source.Favorites -> favorites
         Source.Trash -> trash
         is Source.Folder -> images.filter { it.bucketId == source.bucketId }

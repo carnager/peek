@@ -29,7 +29,7 @@
     <string name="settings_remind_sub">Only when there\'s something new</string>
     <string name="settings_remind_no_notifications">peek can\'t remind you without notifications.</string>
     <string name="settings_time">Time</string>
-    <string name="settings_folders">Folders</string>
+    <string name="settings_folders">Watched folders</string>
     <string name="settings_folders_none">None selected</string>
     <plurals name="settings_folders_count">
         <item quantity="one">%d folder</item>
@@ -115,4 +115,9 @@
     <string name="settings_content_ready">Model on this phone: %1$d MB. Tap to remove</string>
     <string name="settings_content_available">trunk offers it; turn it on in the trunk search</string>
     <string name="settings_content_none">trunk has no model yet; run trunk-ai once</string>
+    <string name="settings_folders_explain">New photos in these folders are offered in the review, and show in the trunk timeline until they are uploaded.</string>
+    <string name="settings_folders_section">Folders</string>
+    <string name="settings_hidden_folders">Hidden folders</string>
+    <string name="settings_hidden_folders_none">None</string>
+    <string name="settings_hidden_folders_explain">Hidden folders are left out of the Folders tab and the timeline. Their photos stay on the phone.</string>
 </resources>

@@ -298,7 +298,23 @@
     <string name="gallery_delete_folder">Ordner löschen</string>
     <string name="gallery_delete_folder_title">„%1$s“ löschen?</string>
     <plurals name="gallery_delete_folder_text">
-        <item quantity="one">Das Foto kommt in den Papierkorb und lässt sich dort 30 Tage lang wiederherstellen.</item>
-        <item quantity="other">Die %1$d Fotos und Videos kommen in den Papierkorb und lassen sich dort 30 Tage lang wiederherstellen.</item>
+        <item quantity="one">1 Foto kommt in den Papierkorb und lässt sich dort 30 Tage lang wiederherstellen.</item>
+        <item quantity="other">%1$d Fotos und Videos kommen in den Papierkorb und lassen sich dort 30 Tage lang wiederherstellen.</item>
+    </plurals>
+    <string name="gallery_hide_folder">Ordner ausblenden</string>
+    <string name="gallery_show_folder">Ordner wieder zeigen</string>
+    <string name="gallery_folder_hidden">„%1$s“ ausgeblendet</string>
+    <plurals name="gallery_hidden_folders_more">
+        <item quantity="one">%1$d ausgeblendeten Ordner zeigen</item>
+        <item quantity="other">%1$d ausgeblendete Ordner zeigen</item>
+    </plurals>
+    <string name="gallery_hidden_folders_less">Ausgeblendete Ordner weglassen</string>
+    <plurals name="gallery_delete_folders_title">
+        <item quantity="one">%1$d Ordner löschen?</item>
+        <item quantity="other">%1$d Ordner löschen?</item>
+    </plurals>
+    <plurals name="gallery_folders_hidden">
+        <item quantity="one">%1$d Ordner ausgeblendet</item>
+        <item quantity="other">%1$d Ordner ausgeblendet</item>
     </plurals>
 </resources>

@@ -300,7 +300,23 @@
     <string name="gallery_delete_folder">Delete folder</string>
     <string name="gallery_delete_folder_title">Delete “%1$s”?</string>
     <plurals name="gallery_delete_folder_text">
-        <item quantity="one">Its photo goes to the trash and can be restored there for 30 days.</item>
-        <item quantity="other">Its %1$d photos and videos go to the trash and can be restored there for 30 days.</item>
+        <item quantity="one">1 photo goes to the trash and can be restored there for 30 days.</item>
+        <item quantity="other">%1$d photos and videos go to the trash and can be restored there for 30 days.</item>
+    </plurals>
+    <string name="gallery_hide_folder">Hide folder</string>
+    <string name="gallery_show_folder">Show folder again</string>
+    <string name="gallery_folder_hidden">“%1$s” hidden</string>
+    <plurals name="gallery_hidden_folders_more">
+        <item quantity="one">Show %1$d hidden folder</item>
+        <item quantity="other">Show %1$d hidden folders</item>
+    </plurals>
+    <string name="gallery_hidden_folders_less">Leave hidden folders out</string>
+    <plurals name="gallery_delete_folders_title">
+        <item quantity="one">Delete %1$d folder?</item>
+        <item quantity="other">Delete %1$d folders?</item>
+    </plurals>
+    <plurals name="gallery_folders_hidden">
+        <item quantity="one">%1$d folder hidden</item>
+        <item quantity="other">%1$d folders hidden</item>
     </plurals>
 </resources>

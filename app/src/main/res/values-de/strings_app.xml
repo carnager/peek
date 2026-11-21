@@ -29,7 +29,7 @@
     <string name="settings_remind_sub">Nur wenn es Neues gibt</string>
     <string name="settings_remind_no_notifications">Ohne Benachrichtigungen kann peek nicht erinnern.</string>
     <string name="settings_time">Uhrzeit</string>
-    <string name="settings_folders">Ordner</string>
+    <string name="settings_folders">Überwachte Ordner</string>
     <string name="settings_folders_none">Keiner gewählt</string>
     <plurals name="settings_folders_count">
         <item quantity="one">%d Ordner</item>
@@ -115,4 +115,9 @@
     <string name="settings_content_ready">Modell auf diesem Handy: %1$d MB. Tippen zum Entfernen</string>
     <string name="settings_content_available">trunk bietet es an; einschalten in der trunk-Suche</string>
     <string name="settings_content_none">trunk hat noch kein Modell; einmal trunk-ai laufen lassen</string>
+    <string name="settings_folders_explain">Neue Fotos in diesen Ordnern kommen in die Prüfung und stehen in der trunk-Zeitleiste, bis sie hochgeladen sind.</string>
+    <string name="settings_folders_section">Ordner</string>
+    <string name="settings_hidden_folders">Ausgeblendete Ordner</string>
+    <string name="settings_hidden_folders_none">Keine</string>
+    <string name="settings_hidden_folders_explain">Ausgeblendete Ordner fehlen im Ordner-Tab und in der Zeitleiste. Ihre Fotos bleiben auf dem Handy.</string>
 </resources>

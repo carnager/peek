@@ -1,5 +1,7 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.PersonOff
@@ -282,7 +284,7 @@ fun PhotoGridScreen(
     var confirmEmpty by remember { mutableStateOf(false) }
     var deletingFolder by remember { mutableStateOf(false) }
     if (deletingFolder && source is Source.Folder) {
-        DeleteFolderDialog(vm, ops, source.bucketId) { deleted -> deletingFolder = false; if (deleted) vm.open = null }
+        DeleteFolderDialog(vm, ops, setOf(source.bucketId)) { deleted -> deletingFolder = false; if (deleted) vm.open = null }
     }
     fun closeSearch() {
         searchOpen = false
@@ -453,6 +455,15 @@ fun PhotoGridScreen(
                         Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.gallery_more)) }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = RoundedCornerShape(20.dp)) {
+                                if (source.bucketId in vm.hiddenFolders) DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_show_folder)) },
+                                    leadingIcon = { Icon(Icons.Rounded.Visibility, null) },
+                                    onClick = { menu = false; vm.hideFolders(vm.hiddenFolders - source.bucketId) },
+                                ) else DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_hide_folder)) },
+                                    leadingIcon = { Icon(Icons.Rounded.VisibilityOff, null) },
+                                    onClick = { menu = false; vm.hideFolder(setOf(source.bucketId)) },
+                                )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.gallery_delete_folder)) },
                                     leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },

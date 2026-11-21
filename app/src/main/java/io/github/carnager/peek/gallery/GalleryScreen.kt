@@ -1,5 +1,11 @@
 package io.github.carnager.peek.gallery
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.ui.draw.alpha
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.lazy.items
@@ -388,13 +394,39 @@ internal fun RootActions(vm: GalleryViewModel) {
 private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, LazyGridState>, tabBar: @Composable () -> Unit) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val t = vm.tab
-    var deleting by remember { mutableStateOf<Long?>(null) }
+    var deleting by remember { mutableStateOf<Set<Long>?>(null) }
+    var showHidden by remember { mutableStateOf(false) }
+    // Long-press selects folders, to hide or delete several at once.
+    var selected by remember { mutableStateOf(emptySet<Long>()) }
+    BackHandler(enabled = selected.isNotEmpty()) { selected = emptySet() }
+    LaunchedEffect(vm.folders) { selected = selected.filterTo(HashSet()) { id -> vm.folders.any { it.bucketId == id } } }
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text("peek", fontFamily = brandFont(), fontSize = if (scroll.state.collapsedFraction < 0.5f) 40.sp else 24.sp) },
-                actions = { RootActions(vm) },
+                navigationIcon = {
+                    if (selected.isNotEmpty()) IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Rounded.Close, stringResource(R.string.gallery_selection_end)) }
+                },
+                title = {
+                    if (selected.isNotEmpty()) Text(stringResource(R.string.gallery_selected, selected.size))
+                    else Text("peek", fontFamily = brandFont(), fontSize = if (scroll.state.collapsedFraction < 0.5f) 40.sp else 24.sp)
+                },
+                actions = {
+                    if (selected.isEmpty()) RootActions(vm)
+                    else {
+                        // All hidden: show them again; otherwise hide them.
+                        if (selected.all { it in vm.hiddenFolders }) {
+                            IconButton(onClick = { vm.hideFolders(vm.hiddenFolders - selected); selected = emptySet() }) {
+                                Icon(Icons.Rounded.Visibility, stringResource(R.string.gallery_show_folder))
+                            }
+                        } else {
+                            IconButton(onClick = { vm.hideFolder(selected); selected = emptySet() }) {
+                                Icon(Icons.Rounded.VisibilityOff, stringResource(R.string.gallery_hide_folder))
+                            }
+                        }
+                        IconButton(onClick = { deleting = selected }) { Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.gallery_delete_folder)) }
+                    }
+                },
                 scrollBehavior = scroll,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -423,17 +455,50 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, La
                 }) { PhoneHeader(vm, ops, timeline = false) } }
                 item(key = "foldersTitle", span = ::full) { SectionTitle(stringResource(R.string.gallery_tab_folders)) }
             }
-            if (vm.folders.isEmpty()) {
+            val hiddenCount = vm.folders.count { it.bucketId in vm.hiddenFolders }
+            if (hiddenCount == 0) showHidden = false
+            val shown = if (showHidden) vm.folders else vm.shownFolders
+            if (shown.isEmpty()) {
                 item(key = "foldersEmpty", span = ::full) { Hint(stringResource(R.string.gallery_folders_empty)) }
             }
-            items(vm.folders, key = { "f:" + it.bucketId }) { a ->
-                AlbumCard(a.name, a.count, a.cover, Modifier.animateItem(fadeInSpec = null), onLongClick = { deleting = a.bucketId }) {
-                    vm.open = Source.Folder(a.bucketId)
+            items(shown, key = { "f:" + it.bucketId }) { a ->
+                // Long-press selects; hidden ones, when shown, are dimmed.
+                val hidden = a.bucketId in vm.hiddenFolders
+                val sel = a.bucketId in selected
+                Box(Modifier.animateItem(fadeInSpec = null)) {
+                    Box(Modifier.alpha(if (hidden) 0.45f else 1f).graphicsLayer { val k = if (sel) 0.92f else 1f; scaleX = k; scaleY = k }) {
+                        AlbumCard(a.name, a.count, a.cover, onLongClick = { selected = selected + a.bucketId }) {
+                            if (selected.isNotEmpty()) selected = if (sel) selected - a.bucketId else selected + a.bucketId
+                            else vm.open = Source.Folder(a.bucketId)
+                        }
+                        if (hidden) Icon(
+                            Icons.Rounded.VisibilityOff, null, tint = Color.White,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(28.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).padding(5.dp),
+                        )
+                    }
+                    if (sel) Icon(
+                        Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(30.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface),
+                    )
+                }
+            }
+            if (hiddenCount > 0) {
+                item(key = "hiddenToggle", span = ::full) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        TextButton(onClick = { showHidden = !showHidden }) {
+                            Icon(if (showHidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, Modifier.size(18.dp).padding(end = 2.dp))
+                            Text(
+                                if (showHidden) stringResource(R.string.gallery_hidden_folders_less)
+                                else pluralStringResource(R.plurals.gallery_hidden_folders_more, hiddenCount, hiddenCount),
+                                modifier = Modifier.padding(start = 6.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
     }
-    deleting?.let { id -> DeleteFolderDialog(vm, ops, id) { deleting = null } }
+    deleting?.let { ids -> DeleteFolderDialog(vm, ops, ids) { done -> deleting = null; if (done) selected = emptySet() } }
 }
 
 /**
@@ -441,13 +506,16 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, La
  * 30 days. The folder disappears with its last photo.
  */
 @Composable
-internal fun DeleteFolderDialog(vm: GalleryViewModel, ops: MediaOps, bucketId: Long, onDone: (deleted: Boolean) -> Unit) {
-    val name = vm.folders.firstOrNull { it.bucketId == bucketId }?.name ?: ""
-    val images = vm.imagesOf(Source.Folder(bucketId))
+internal fun DeleteFolderDialog(vm: GalleryViewModel, ops: MediaOps, bucketIds: Set<Long>, onDone: (deleted: Boolean) -> Unit) {
+    val names = vm.folders.filter { it.bucketId in bucketIds }.map { it.name }
+    val images = vm.images.filter { it.bucketId in bucketIds }
     AlertDialog(
         onDismissRequest = { onDone(false) },
         shape = RoundedCornerShape(28.dp),
-        title = { Text(stringResource(R.string.gallery_delete_folder_title, name)) },
+        title = {
+            Text(if (names.size == 1) stringResource(R.string.gallery_delete_folder_title, names[0])
+                 else pluralStringResource(R.plurals.gallery_delete_folders_title, names.size, names.size))
+        },
         text = { Text(pluralStringResource(R.plurals.gallery_delete_folder_text, images.size, images.size)) },
         confirmButton = {
             Button(onClick = { ops.trash(images); onDone(true) }, enabled = images.isNotEmpty()) {
