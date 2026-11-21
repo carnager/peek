@@ -465,7 +465,7 @@ private fun AlbumsScreen(vm: GalleryViewModel, ops: MediaOps, grids: Map<Tab, La
                 // Long-press selects; hidden ones, when shown, are dimmed.
                 val hidden = a.bucketId in vm.hiddenFolders
                 val sel = a.bucketId in selected
-                Box(Modifier.animateItem(fadeInSpec = null)) {
+                Box {
                     Box(Modifier.alpha(if (hidden) 0.45f else 1f).graphicsLayer { val k = if (sel) 0.92f else 1f; scaleX = k; scaleY = k }) {
                         AlbumCard(a.name, a.count, a.cover, onLongClick = { selected = selected + a.bucketId }) {
                             if (selected.isNotEmpty()) selected = if (sel) selected - a.bucketId else selected + a.bucketId
