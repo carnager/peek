@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -13,10 +12,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.PlayCircle
@@ -150,7 +148,6 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
                             Modifier
                                 .aspectRatio(1f)
                                 .clip(RoundedCornerShape(10.dp))
-                                .then(if (s == 2 && marked) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)) else Modifier)
                                 .combinedClickable(
                                     onClick = {
                                         if (s == 1) discard = if (marked) discard - img.id else discard + img.id
@@ -169,11 +166,9 @@ fun ReviewScreen(vm: GalleryViewModel, ops: MediaOps, session: GalleryViewModel.
                                 }
                             }
                             if (s == 2 && marked) {
-                                Icon(
-                                    Icons.Rounded.CheckCircle, stringResource(R.string.review_marked_upload),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).background(Color.White, CircleShape),
-                                )
+                                Box(Modifier.fillMaxSize().background(Color(0xCC1A4F8B)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Rounded.CloudUpload, stringResource(R.string.review_marked_upload), tint = Color.White, modifier = Modifier.size(36.dp))
+                                }
                             }
                         }
                     }
