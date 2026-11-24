@@ -2,20 +2,23 @@
 
 <img src="docs/brand/peek-icon.svg" width="96" align="right" alt="peek">
 
-Gallery for Android, and the phone app for [trunk](https://github.com/carnager/trunk), a
-self-hosted photo and video server.
+A gallery for Android. It works on its own with the photos and videos on your phone. If you
+run [trunk](https://github.com/carnager/trunk), a self-hosted photo and video server, peek can
+connect to it too, but it doesn't have to.
 
-- Photos on the phone and on trunk in one timeline.
-- The evening review: go through what's new, pick what goes to the trash, then what goes to trunk.
-  Nothing is deleted or uploaded without it.
-- Uploads in the background, resumable, and skips what trunk already has. Optional size limit for
-  photos.
-- Albums, favourites, trash, memories, people, public links, sharing within the household.
-- Search by place, date and name, and by what's in the photo when trunk runs `trunk-ai`.
-- Cleanup of look-alikes and bursts on trunk: keep the best, the rest goes to trunk's trash.
+- Timeline, folders, albums, favourites, memories and trash for what's on the phone.
+- The evening review: go through what's new and pick what goes to the trash.
 - Editor: crop, filters, colour, drawing and text.
 
-Without trunk, peek is a plain gallery for the photos on the phone.
+### With trunk (optional)
+
+- Photos on the phone and on trunk in one timeline.
+- A second review step: pick what goes to trunk. Nothing is uploaded without it.
+- Uploads in the background, resumable, and skips what trunk already has. Optional size limit for
+  photos.
+- Albums on trunk, people, public links, sharing within the household.
+- Search by place, date and name, and by what's in the photo when trunk runs `trunk-ai`.
+- Cleanup of look-alikes and bursts on trunk: keep the best, the rest goes to trunk's trash.
 
 Needs Android 11+.
 
